@@ -42,44 +42,30 @@ BOOTLOADER = $(BUILD_ARCH_DIR)/boot.bin
 KERNEL = $(BUILD_ARCH_DIR)/kernel.bin
 ISO = $(BUILD_ARCH_DIR)/boruix-$(ARCH).iso
 
-# 源文件
+# 自动发现源文件
 BOOTLOADER_SRC = $(SRC_DIR)/boot/boot.asm
-KERNEL_SRCS = $(SRC_DIR)/kernel/kernel/core/main.c \
-              $(SRC_DIR)/kernel/kernel/core/multiboot.c \
-              $(SRC_DIR)/kernel/drivers/display/display.c \
-              $(SRC_DIR)/kernel/drivers/cmos/cmos.c \
-              $(SRC_DIR)/kernel/drivers/keyboard/keyboard.c \
-              $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupts/interrupt.c \
-              $(SRC_DIR)/kernel/memory/memory_common.c
 
-# 架构特定的内存管理
-ifeq ($(ARCH),x86_64)
-    KERNEL_SRCS += $(SRC_DIR)/kernel/memory/memory_x86_64.c
-else
-    KERNEL_SRCS += $(SRC_DIR)/kernel/memory/memory_i386.c
-endif
+# 自动发现所有C源文件
+KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/drivers/*/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/memory/memory_common.c)
 
-# 架构特定的汇编文件
-ifeq ($(ARCH),x86_64)
-    KERNEL_ASM_SRCS = $(SRC_DIR)/kernel/arch/x86_64/boot/start.asm
-    KERNEL_ASM_OBJS = $(BUILD_ARCH_DIR)/start.o
-else
-    KERNEL_ASM_SRCS = 
-    KERNEL_ASM_OBJS = 
-endif
+# 架构特定的C源文件
+KERNEL_ARCH_SRCS = $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/*/*.c) \
+                   $(wildcard $(SRC_DIR)/kernel/memory/memory_$(ARCH).c)
+
+# 合并所有C源文件
+KERNEL_SRCS = $(KERNEL_COMMON_SRCS) $(KERNEL_ARCH_SRCS)
+
+# 自动发现架构特定的汇编文件
+KERNEL_ASM_SRCS = $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/*.asm)
+
+# 生成对象文件列表
+KERNEL_C_OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_ARCH_DIR)/%.o,$(KERNEL_SRCS))
+KERNEL_ASM_OBJS = $(patsubst $(SRC_DIR)/%.asm,$(BUILD_ARCH_DIR)/%.o,$(KERNEL_ASM_SRCS))
+KERNEL_OBJS = $(KERNEL_C_OBJS) $(KERNEL_ASM_OBJS)
 
 LINKER_SCRIPT = $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/linker.ld
-# 基础对象文件
-KERNEL_BASE_OBJS = $(BUILD_ARCH_DIR)/main.o $(BUILD_ARCH_DIR)/multiboot.o $(BUILD_ARCH_DIR)/display.o $(BUILD_ARCH_DIR)/cmos.o $(BUILD_ARCH_DIR)/keyboard.o $(BUILD_ARCH_DIR)/interrupt.o $(BUILD_ARCH_DIR)/memory_common.o
-
-# 架构特定的对象文件
-ifeq ($(ARCH),x86_64)
-    KERNEL_ARCH_OBJS = $(BUILD_ARCH_DIR)/memory_x86_64.o
-else
-    KERNEL_ARCH_OBJS = $(BUILD_ARCH_DIR)/memory_i386.o
-endif
-
-KERNEL_OBJS = $(KERNEL_BASE_OBJS) $(KERNEL_ARCH_OBJS) $(KERNEL_ASM_OBJS)
 
 # 默认目标
 all: $(ISO)
@@ -99,40 +85,15 @@ $(BUILD_ARCH_DIR)/linker.ld: $(LINKER_SCRIPT) | $(BUILD_ARCH_DIR)
 $(BOOTLOADER): $(BOOTLOADER_SRC) | $(BUILD_ARCH_DIR)
 	$(AS) -f bin -o $@ $<
 
-# 编译内核对象文件
-$(BUILD_ARCH_DIR)/main.o: $(SRC_DIR)/kernel/kernel/core/main.c | $(BUILD_ARCH_DIR)
+# 通用编译规则 - 自动处理所有C文件
+$(BUILD_ARCH_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_ARCH_DIR)
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
 
-$(BUILD_ARCH_DIR)/multiboot.o: $(SRC_DIR)/kernel/kernel/core/multiboot.c | $(BUILD_ARCH_DIR)
-	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
-
-$(BUILD_ARCH_DIR)/display.o: $(SRC_DIR)/kernel/drivers/display/display.c | $(BUILD_ARCH_DIR)
-	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
-
-$(BUILD_ARCH_DIR)/cmos.o: $(SRC_DIR)/kernel/drivers/cmos/cmos.c | $(BUILD_ARCH_DIR)
-	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
-
-$(BUILD_ARCH_DIR)/keyboard.o: $(SRC_DIR)/kernel/drivers/keyboard/keyboard.c | $(BUILD_ARCH_DIR)
-	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
-
-$(BUILD_ARCH_DIR)/interrupt.o: $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupts/interrupt.c | $(BUILD_ARCH_DIR)
-	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
-
-# 内存管理模块编译
-$(BUILD_ARCH_DIR)/memory_common.o: $(SRC_DIR)/kernel/memory/memory_common.c | $(BUILD_ARCH_DIR)
-	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
-
-$(BUILD_ARCH_DIR)/memory_x86_64.o: $(SRC_DIR)/kernel/memory/memory_x86_64.c | $(BUILD_ARCH_DIR)
-	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
-
-$(BUILD_ARCH_DIR)/memory_i386.o: $(SRC_DIR)/kernel/memory/memory_i386.c | $(BUILD_ARCH_DIR)
-	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
-
-# x86_64汇编文件编译
-ifeq ($(ARCH),x86_64)
-$(BUILD_ARCH_DIR)/start.o: $(SRC_DIR)/kernel/arch/x86_64/boot/start.asm | $(BUILD_ARCH_DIR)
+# 通用汇编编译规则 - 自动处理所有ASM文件  
+$(BUILD_ARCH_DIR)/%.o: $(SRC_DIR)/%.asm | $(BUILD_ARCH_DIR)
+	@mkdir -p $(dir $@)
 	$(AS) $(ASFLAGS) -o $@ $<
-endif
 
 # 链接内核
 $(KERNEL): $(KERNEL_OBJS) $(BUILD_ARCH_DIR)/linker.ld
@@ -191,47 +152,9 @@ info:
 	@echo "Build directory: $(BUILD_ARCH_DIR)"
 	@echo "ISO file: $(ISO)"
 
-# 显示项目结构
-tree:
-	@echo "Boruix OS 项目结构 (支持双架构):"
-	@echo "├── src/"
-	@echo "│   ├── boot/"
-	@echo "│   │   └── boot.asm"
-	@echo "│   └── kernel/"
-	@echo "│       ├── include/"
-	@echo "│       │   ├── kernel/"
-	@echo "│       │   │   ├── kernel.h"
-	@echo "│       │   │   └── types.h"
-	@echo "│       │   ├── arch/"
-	@echo "│       │   │   ├── i386.h"
-	@echo "│       │   │   ├── x86_64.h"
-	@echo "│       │   │   └── interrupt.h"
-	@echo "│       │   └── drivers/"
-	@echo "│       │       ├── keyboard.h"
-	@echo "│       │       ├── display.h"
-	@echo "│       │       └── cmos.h"
-	@echo "│       ├── kernel/"
-	@echo "│       │   └── core/"
-	@echo "│       │       └── main.c"
-	@echo "│       ├── drivers/"
-	@echo "│       │   ├── keyboard/"
-	@echo "│       │   ├── display/"
-	@echo "│       │   └── cmos/"
-	@echo "│       └── arch/"
-	@echo "│           ├── i386/"
-	@echo "│           │   ├── boot/"
-	@echo "│           │   └── interrupts/"
-	@echo "│           └── x86_64/"
-	@echo "│               ├── boot/"
-	@echo "│               └── interrupts/"
-	@echo "├── build/"
-	@echo "│   ├── i386/ (32位构建文件)"
-	@echo "│   └── x86_64/ (64位构建文件)"
-	@echo "└── Makefile"
-
 # 显示帮助
 help:
-	@echo "Boruix OS 双架构构建系统"
+	@echo "Boruix OS"
 	@echo ""
 	@echo "架构选择:"
 	@echo "  make ARCH=i386 [target]   - 构建32位版本 (默认)"
@@ -247,13 +170,6 @@ help:
 	@echo "  run        - 在QEMU中运行ISO"
 	@echo "  run-floppy - 在QEMU中运行软盘"
 	@echo "  info       - 显示当前架构信息"
-	@echo "  tree       - 显示项目结构"
 	@echo "  help       - 显示此帮助"
-	@echo ""
-	@echo "示例:"
-	@echo "  make                    # 构建i386版本"
-	@echo "  make ARCH=x86_64 all    # 构建x86_64版本"
-	@echo "  make build-all          # 构建两个架构"
-	@echo "  make ARCH=x86_64 run    # 运行64位版本"
 
-.PHONY: all rebuild clean clean-all distclean run run-floppy build-all info tree help
+.PHONY: all rebuild clean clean-all distclean run run-floppy build-all info help
