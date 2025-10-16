@@ -1,5 +1,5 @@
 // Boruix OS 键盘驱动实现
-// 处理PS/2键盘输入
+// 处理PS/2键盘输入，支持通用组合键系统
 
 #include "drivers/keyboard.h"
 #include "drivers/display.h"
@@ -7,6 +7,18 @@
 
 // 全局键盘状态
 static keyboard_state_t keyboard_state;
+
+// 全局时间戳计数器（简单实现）
+static uint32_t global_timestamp = 0;
+
+// 函数声明
+static uint32_t get_timestamp(void);
+static void increment_timestamp(void);
+static void add_combo_event(combo_event_type_t type, uint8_t scancode, uint8_t ascii);
+static void process_key_event(uint8_t scancode);
+static void reset_combo_sequence(void);
+static int is_modifier_key(uint8_t scancode);
+static uint8_t get_modifier_state(void);
 
 // 扫描码到ASCII码的映射表（无Shift）
 static const unsigned char scancode_to_ascii[128] = {
@@ -50,50 +62,49 @@ void keyboard_init(void) {
     keyboard_state.alt_pressed = 0;
     keyboard_state.caps_lock = 0;
     
+    // 初始化通用组合键系统
+    keyboard_state.combo_state.sequence_length = 0;
+    keyboard_state.combo_state.last_event_time = 0;
+    keyboard_state.combo_state.modifier_state = 0;
+    keyboard_state.combo_state.is_active = 0;
+    
+    keyboard_state.event_head = 0;
+    keyboard_state.event_tail = 0;
+    keyboard_state.event_count = 0;
+    
     // 清空缓冲区
     for (int i = 0; i < KEYBOARD_BUFFER_SIZE; i++) {
         keyboard_state.buffer[i] = 0;
+        keyboard_state.event_buffer[i].type = COMBO_EVENT_NONE;
+        keyboard_state.event_buffer[i].scancode = 0;
+        keyboard_state.event_buffer[i].ascii = 0;
+        keyboard_state.event_buffer[i].timestamp = 0;
     }
+    
+    // 清空组合键序列
+    for (int i = 0; i < MAX_COMBO_SEQUENCE; i++) {
+        keyboard_state.combo_state.sequence[i] = 0;
+    }
+    
+    global_timestamp = 0;
 }
 
 // 读取键盘扫描码（轮询模式，非阻塞）
 unsigned char keyboard_read_scancode(void) {
     // 检查数据是否可用
     if (!(inb(KEYBOARD_STATUS_PORT) & KEYBOARD_STATUS_OUTPUT_BUFFER_FULL)) {
+        increment_timestamp(); // 增加时间戳
         return 0; // 没有数据
     }
     
     // 读取扫描码
     unsigned char scancode = inb(KEYBOARD_DATA_PORT);
     
-    // 处理特殊键
-    switch (scancode) {
-        case KEY_SHIFT_LEFT:
-        case KEY_SHIFT_RIGHT:
-            keyboard_state.shift_pressed = 1;
-            return 0; // 不返回字符
-        case KEY_SHIFT_LEFT | 0x80:
-        case KEY_SHIFT_RIGHT | 0x80:
-            keyboard_state.shift_pressed = 0;
-            return 0; // 不返回字符
-        case KEY_CTRL:
-            keyboard_state.ctrl_pressed = 1;
-            return 0;
-        case KEY_CTRL | 0x80:
-            keyboard_state.ctrl_pressed = 0;
-            return 0;
-        case KEY_ALT:
-            keyboard_state.alt_pressed = 1;
-            return 0;
-        case KEY_ALT | 0x80:
-            keyboard_state.alt_pressed = 0;
-            return 0;
-        case KEY_CAPS_LOCK:
-            keyboard_state.caps_lock = !keyboard_state.caps_lock;
-            return 0;
-        default:
-            return scancode;
-    }
+    // 处理键盘事件
+    process_key_event(scancode);
+    
+    increment_timestamp(); // 增加时间戳
+    return scancode;
 }
 
 // 将扫描码转换为ASCII码
@@ -116,48 +127,9 @@ unsigned char keyboard_scancode_to_ascii(unsigned char scancode) {
     }
 }
 
-// 键盘中断处理程序
+// 键盘中断处理程序（使用新的事件系统）
 void keyboard_interrupt_handler(void) {
-    unsigned char scancode = keyboard_read_scancode();
-    
-    // 处理特殊键
-    switch (scancode) {
-        case KEY_SHIFT_LEFT:
-        case KEY_SHIFT_RIGHT:
-            keyboard_state.shift_pressed = 1;
-            break;
-        case KEY_SHIFT_LEFT | 0x80:
-        case KEY_SHIFT_RIGHT | 0x80:
-            keyboard_state.shift_pressed = 0;
-            break;
-        case KEY_CTRL:
-            keyboard_state.ctrl_pressed = 1;
-            break;
-        case KEY_CTRL | 0x80:
-            keyboard_state.ctrl_pressed = 0;
-            break;
-        case KEY_ALT:
-            keyboard_state.alt_pressed = 1;
-            break;
-        case KEY_ALT | 0x80:
-            keyboard_state.alt_pressed = 0;
-            break;
-        case KEY_CAPS_LOCK:
-            keyboard_state.caps_lock = !keyboard_state.caps_lock;
-            break;
-        default:
-            // 处理普通字符
-            unsigned char ascii = keyboard_scancode_to_ascii(scancode);
-            if (ascii != 0) {
-                // 添加到缓冲区
-                if (keyboard_state.count < KEYBOARD_BUFFER_SIZE) {
-                    keyboard_state.buffer[keyboard_state.tail] = ascii;
-                    keyboard_state.tail = (keyboard_state.tail + 1) % KEYBOARD_BUFFER_SIZE;
-                    keyboard_state.count++;
-                }
-            }
-            break;
-    }
+    keyboard_read_scancode(); // 这会自动处理所有键盘事件
 }
 
 // 获取一个字符（非阻塞）
@@ -183,4 +155,215 @@ void keyboard_clear_buffer(void) {
     keyboard_state.head = 0;
     keyboard_state.tail = 0;
     keyboard_state.count = 0;
+    keyboard_state.event_head = 0;
+    keyboard_state.event_tail = 0;
+    keyboard_state.event_count = 0;
+    reset_combo_sequence();
+}
+
+// === 通用组合键系统实现 ===
+
+// 获取时间戳
+static uint32_t get_timestamp(void) {
+    return global_timestamp;
+}
+
+// 增加时间戳
+static void increment_timestamp(void) {
+    global_timestamp++;
+}
+
+// 添加组合键事件到缓冲区
+static void add_combo_event(combo_event_type_t type, uint8_t scancode, uint8_t ascii) {
+    if (keyboard_state.event_count >= KEYBOARD_BUFFER_SIZE) {
+        return; // 缓冲区满
+    }
+    
+    combo_event_t* event = &keyboard_state.event_buffer[keyboard_state.event_tail];
+    event->type = type;
+    event->scancode = scancode;
+    event->ascii = ascii;
+    event->timestamp = get_timestamp();
+    
+    keyboard_state.event_tail = (keyboard_state.event_tail + 1) % KEYBOARD_BUFFER_SIZE;
+    keyboard_state.event_count++;
+}
+
+// 处理键盘事件
+static void process_key_event(uint8_t scancode) {
+    uint8_t is_key_up = (scancode & 0x80) != 0;
+    uint8_t key_code = scancode & 0x7F;
+    
+    if (is_key_up) {
+        // 键释放事件
+        add_combo_event(COMBO_EVENT_KEY_UP, key_code, 0);
+        
+        // 更新修饰键状态
+        switch (key_code) {
+            case KEY_SHIFT_LEFT:
+            case KEY_SHIFT_RIGHT:
+                keyboard_state.shift_pressed = 0;
+                add_combo_event(COMBO_EVENT_MODIFIER_CHANGE, key_code, 0);
+                // 如果所有修饰键都释放了，重置组合键状态
+                if (!keyboard_state.ctrl_pressed && !keyboard_state.alt_pressed) {
+                    reset_combo_sequence();
+                }
+                break;
+            case KEY_CTRL:
+                keyboard_state.ctrl_pressed = 0;
+                add_combo_event(COMBO_EVENT_MODIFIER_CHANGE, key_code, 0);
+                // 如果所有修饰键都释放了，重置组合键状态
+                if (!keyboard_state.shift_pressed && !keyboard_state.alt_pressed) {
+                    reset_combo_sequence();
+                }
+                break;
+            case KEY_ALT:
+                keyboard_state.alt_pressed = 0;
+                add_combo_event(COMBO_EVENT_MODIFIER_CHANGE, key_code, 0);
+                // 如果所有修饰键都释放了，重置组合键状态
+                if (!keyboard_state.shift_pressed && !keyboard_state.ctrl_pressed) {
+                    reset_combo_sequence();
+                }
+                break;
+        }
+    } else {
+        // 键按下事件
+        add_combo_event(COMBO_EVENT_KEY_DOWN, key_code, 0);
+        
+        // 更新修饰键状态
+        switch (key_code) {
+            case KEY_SHIFT_LEFT:
+            case KEY_SHIFT_RIGHT:
+                keyboard_state.shift_pressed = 1;
+                add_combo_event(COMBO_EVENT_MODIFIER_CHANGE, key_code, 0);
+                break;
+            case KEY_CTRL:
+                keyboard_state.ctrl_pressed = 1;
+                add_combo_event(COMBO_EVENT_MODIFIER_CHANGE, key_code, 0);
+                break;
+            case KEY_ALT:
+                keyboard_state.alt_pressed = 1;
+                add_combo_event(COMBO_EVENT_MODIFIER_CHANGE, key_code, 0);
+                break;
+            case KEY_CAPS_LOCK:
+                keyboard_state.caps_lock = !keyboard_state.caps_lock;
+                break;
+            default:
+                // 处理普通字符
+                unsigned char ascii = keyboard_scancode_to_ascii(scancode);
+                if (ascii != 0) {
+                    // 添加到普通字符缓冲区
+                    if (keyboard_state.count < KEYBOARD_BUFFER_SIZE) {
+                        keyboard_state.buffer[keyboard_state.tail] = ascii;
+                        keyboard_state.tail = (keyboard_state.tail + 1) % KEYBOARD_BUFFER_SIZE;
+                        keyboard_state.count++;
+                    }
+                }
+                
+                // 只有在按下修饰键时才添加到组合键序列
+                if (keyboard_state.ctrl_pressed || keyboard_state.shift_pressed || keyboard_state.alt_pressed) {
+                    if (keyboard_state.combo_state.sequence_length < MAX_COMBO_SEQUENCE) {
+                        keyboard_state.combo_state.sequence[keyboard_state.combo_state.sequence_length] = key_code;
+                        keyboard_state.combo_state.sequence_length++;
+                        keyboard_state.combo_state.last_event_time = get_timestamp();
+                        keyboard_state.combo_state.modifier_state = get_modifier_state();
+                        keyboard_state.combo_state.is_active = 1;
+                    }
+                }
+                break;
+        }
+    }
+}
+
+// 重置组合键序列
+static void reset_combo_sequence(void) {
+    keyboard_state.combo_state.sequence_length = 0;
+    keyboard_state.combo_state.last_event_time = 0;
+    keyboard_state.combo_state.modifier_state = 0;
+    keyboard_state.combo_state.is_active = 0;
+    
+    for (int i = 0; i < MAX_COMBO_SEQUENCE; i++) {
+        keyboard_state.combo_state.sequence[i] = 0;
+    }
+}
+
+// 检查是否为修饰键（保留以备将来使用）
+static int is_modifier_key(uint8_t scancode) {
+    return (scancode == KEY_SHIFT_LEFT || scancode == KEY_SHIFT_RIGHT ||
+            scancode == KEY_CTRL || scancode == KEY_ALT);
+}
+
+// 获取修饰键状态
+static uint8_t get_modifier_state(void) {
+    uint8_t state = 0;
+    if (keyboard_state.shift_pressed) state |= 0x01;
+    if (keyboard_state.ctrl_pressed) state |= 0x02;
+    if (keyboard_state.alt_pressed) state |= 0x04;
+    if (keyboard_state.caps_lock) state |= 0x08;
+    return state;
+}
+
+// === 公共API函数 ===
+
+// 获取组合键事件
+combo_event_t keyboard_get_combo_event(void) {
+    if (keyboard_state.event_count == 0) {
+        combo_event_t empty_event = {COMBO_EVENT_NONE, 0, 0, 0};
+        return empty_event;
+    }
+    
+    combo_event_t event = keyboard_state.event_buffer[keyboard_state.event_head];
+    keyboard_state.event_head = (keyboard_state.event_head + 1) % KEYBOARD_BUFFER_SIZE;
+    keyboard_state.event_count--;
+    
+    return event;
+}
+
+// 检查是否有组合键事件
+int keyboard_has_combo_event(void) {
+    return keyboard_state.event_count > 0;
+}
+
+// 处理组合键序列
+void keyboard_process_combo_sequence(uint8_t* sequence, int length, uint8_t modifiers) {
+    // 这个函数可以被shell调用来处理完整的组合键序列
+    // 序列格式：[修饰键状态][按键1][按键2]...[按键N]
+    if (length > 0 && length <= MAX_COMBO_SEQUENCE) {
+        keyboard_state.combo_state.modifier_state = modifiers;
+        keyboard_state.combo_state.sequence_length = length;
+        keyboard_state.combo_state.last_event_time = get_timestamp();
+        keyboard_state.combo_state.is_active = 1;
+        
+        for (int i = 0; i < length; i++) {
+            keyboard_state.combo_state.sequence[i] = sequence[i];
+        }
+    }
+}
+
+// 检查组合键是否激活
+int keyboard_is_combo_active(void) {
+    return keyboard_state.combo_state.is_active;
+}
+
+// 重置组合键状态
+void keyboard_reset_combo_state(void) {
+    reset_combo_sequence();
+}
+
+// 获取修饰键状态
+uint8_t keyboard_get_modifier_state(void) {
+    return get_modifier_state();
+}
+
+// 检查修饰键状态
+int keyboard_is_ctrl_pressed(void) {
+    return keyboard_state.ctrl_pressed;
+}
+
+int keyboard_is_shift_pressed(void) {
+    return keyboard_state.shift_pressed;
+}
+
+int keyboard_is_alt_pressed(void) {
+    return keyboard_state.alt_pressed;
 }

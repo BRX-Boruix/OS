@@ -9,6 +9,7 @@
 // 全局变量
 static char input_buffer[SHELL_BUFFER_SIZE];
 static int buffer_pos = 0;
+static int cursor_pos = 0;  // 光标在输入缓冲区中的位置
 
 // 命令表
 static shell_command_t commands[] = {
@@ -68,6 +69,272 @@ void shell_print_prompt(void) {
     print_string(SHELL_PROMPT);
 }
 
+// 显示控制字符（如^C, ^V等）
+void shell_display_control_char(uint8_t key) {
+    print_char('^');
+    // 将扫描码转换为控制字符显示
+    switch (key) {
+        case 0x2E: // C键
+            print_char('C');
+            break;
+        case 0x2F: // V键
+            print_char('V');
+            break;
+        case 0x26: // L键
+            print_char('L');
+            break;
+        case 0x16: // U键
+            print_char('U');
+            break;
+        case 0x25: // K键
+            print_char('K');
+            break;
+        case 0x1E: // A键
+            print_char('A');
+            break;
+        case 0x12: // E键
+            print_char('E');
+            break;
+        case 0x11: // W键
+            print_char('W');
+            break;
+        case 0x20: // D键
+            print_char('D');
+            break;
+        case 0x1C: // 回车键
+            print_char('M');
+            break;
+        case 0x0E: // 退格键
+            print_char('H');
+            break;
+        case 0x0F: // Tab键
+            print_char('I');
+            break;
+        case 0x01: // Esc键
+            print_char('[');
+            break;
+        default:
+            // 对于其他键，显示十六进制
+            print_char('0');
+            print_char('x');
+            if (key < 16) print_char('0');
+            // 简单的十六进制显示
+            if (key >= 16) {
+                print_char('1');
+                key -= 16;
+            }
+            if (key >= 10) {
+                print_char('A' + (key - 10));
+            } else {
+                print_char('0' + key);
+            }
+            break;
+    }
+}
+
+// 通用组合键处理函数
+void shell_handle_combo_sequence(uint8_t* sequence, int length, uint8_t modifiers) {
+    if (length == 0) return;
+    
+    // 检查是否是Ctrl组合键
+    if (modifiers & 0x02) { // Ctrl键被按下
+        if (length == 1) {
+            uint8_t key = sequence[0];
+            
+            // 根据按键处理不同的Ctrl组合键
+            switch (key) {
+                case 0x2E: // Ctrl+C (C键)
+                    shell_display_control_char(key);
+                    print_char('\n');
+                    buffer_pos = 0;
+                    cursor_pos = 0;
+                    shell_print_prompt();
+                    break;
+                    
+                case 0x2F: // Ctrl+V (V键)
+                    shell_display_control_char(key);
+                    print_string(" - Paste (not implemented)\n");
+                    shell_print_prompt();
+                    break;
+                    
+                case 0x26: // Ctrl+L (L键)
+                    shell_display_control_char(key);
+                    print_char('\n');
+                    clear_screen();
+                    shell_print_prompt();
+                    if (buffer_pos > 0) {
+                        print_string(input_buffer);
+                    }
+                    break;
+                    
+                case 0x16: // Ctrl+U (U键)
+                    shell_display_control_char(key);
+                    print_string(" - Delete to beginning of line\n");
+                    if (cursor_pos > 0) {
+                        // 删除到行首
+                        for (int i = 0; i < cursor_pos; i++) {
+                            print_char('\b');
+                        }
+                        int chars_to_delete = cursor_pos;
+                        for (int i = 0; i < chars_to_delete; i++) {
+                            print_char(' ');
+                        }
+                        for (int i = 0; i < chars_to_delete; i++) {
+                            print_char('\b');
+                        }
+                        for (int i = cursor_pos; i < buffer_pos; i++) {
+                            input_buffer[i - cursor_pos] = input_buffer[i];
+                            print_char(input_buffer[i]);
+                        }
+                        for (int i = buffer_pos; i > buffer_pos - cursor_pos; i--) {
+                            print_char(' ');
+                        }
+                        for (int i = buffer_pos; i > buffer_pos - cursor_pos; i--) {
+                            print_char('\b');
+                        }
+                        buffer_pos -= cursor_pos;
+                        cursor_pos = 0;
+                    }
+                    shell_print_prompt();
+                    break;
+                    
+                case 0x25: // Ctrl+K (K键)
+                    shell_display_control_char(key);
+                    print_string(" - Delete to end of line\n");
+                    if (cursor_pos < buffer_pos) {
+                        int chars_to_delete = buffer_pos - cursor_pos;
+                        for (int i = 0; i < chars_to_delete; i++) {
+                            print_char(' ');
+                        }
+                        for (int i = 0; i < chars_to_delete; i++) {
+                            print_char('\b');
+                        }
+                        buffer_pos = cursor_pos;
+                    }
+                    shell_print_prompt();
+                    break;
+                    
+                case 0x1E: // Ctrl+A (A键)
+                    shell_display_control_char(key);
+                    print_string(" - Move to beginning of line\n");
+                    for (int i = 0; i < cursor_pos; i++) {
+                        print_char('\b');
+                    }
+                    cursor_pos = 0;
+                    break;
+                    
+                case 0x12: // Ctrl+E (E键)
+                    shell_display_control_char(key);
+                    print_string(" - Move to end of line\n");
+                    for (int i = cursor_pos; i < buffer_pos; i++) {
+                        print_char(input_buffer[i]);
+                    }
+                    cursor_pos = buffer_pos;
+                    break;
+                    
+                case 0x11: // Ctrl+W (W键)
+                    shell_display_control_char(key);
+                    print_string(" - Delete previous word\n");
+                    if (cursor_pos > 0) {
+                        int word_start = cursor_pos;
+                        while (word_start > 0 && input_buffer[word_start - 1] == ' ') {
+                            word_start--;
+                        }
+                        while (word_start > 0 && input_buffer[word_start - 1] != ' ') {
+                            word_start--;
+                        }
+                        
+                        int chars_to_delete = cursor_pos - word_start;
+                        for (int i = 0; i < chars_to_delete; i++) {
+                            print_char('\b');
+                        }
+                        for (int i = 0; i < chars_to_delete; i++) {
+                            print_char(' ');
+                        }
+                        for (int i = 0; i < chars_to_delete; i++) {
+                            print_char('\b');
+                        }
+                        for (int i = cursor_pos; i < buffer_pos; i++) {
+                            input_buffer[i - chars_to_delete] = input_buffer[i];
+                            print_char(input_buffer[i]);
+                        }
+                        for (int i = buffer_pos; i > buffer_pos - chars_to_delete; i--) {
+                            print_char(' ');
+                        }
+                        for (int i = buffer_pos; i > buffer_pos - chars_to_delete; i--) {
+                            print_char('\b');
+                        }
+                        buffer_pos -= chars_to_delete;
+                        cursor_pos = word_start;
+                    }
+                    break;
+                    
+                case 0x20: // Ctrl+D (D键)
+                    shell_display_control_char(key);
+                    print_string(" - EOF signal\n");
+                    if (buffer_pos == 0) {
+                        print_string("\nGoodbye!\n");
+                    }
+                    break;
+                    
+                case 0x13: // Ctrl+S (S键)
+                    shell_display_control_char(key);
+                    print_string(" - Save (not implemented)\n");
+                    break;
+                    
+                case 0x14: // Ctrl+T (T键)
+                    shell_display_control_char(key);
+                    print_string(" - Transpose characters (not implemented)\n");
+                    break;
+                    
+                case 0x18: // Ctrl+X (X键)
+                    shell_display_control_char(key);
+                    print_string(" - Cut (not implemented)\n");
+                    break;
+                    
+                case 0x19: // Ctrl+Y (Y键)
+                    shell_display_control_char(key);
+                    print_string(" - Paste (not implemented)\n");
+                    break;
+                    
+                case 0x1A: // Ctrl+Z (Z键)
+                    shell_display_control_char(key);
+                    print_string(" - Suspend (not implemented)\n");
+                    break;
+                    
+                default:
+                    // 显示未定义的控制字符
+                    shell_display_control_char(key);
+                    print_string(" - Unknown control sequence\n");
+                    break;
+            }
+        } else {
+            // 处理多键组合（最多10层）
+            // 这里可以处理更复杂的组合键序列
+            // 例如：Ctrl+Shift+A, Ctrl+Alt+X 等
+        }
+    }
+    
+    // 检查是否是Shift组合键
+    if (modifiers & 0x01) { // Shift键被按下
+        // 处理Shift组合键
+    }
+    
+    // 检查是否是Alt组合键
+    if (modifiers & 0x04) { // Alt键被按下
+        // 处理Alt组合键
+    }
+    
+    // 检查是否是复合修饰键（例如Ctrl+Shift, Alt+Ctrl等）
+    if ((modifiers & 0x02) && (modifiers & 0x01)) { // Ctrl+Shift
+        // 处理Ctrl+Shift组合键
+    }
+    
+    if ((modifiers & 0x02) && (modifiers & 0x04)) { // Ctrl+Alt
+        // 处理Ctrl+Alt组合键
+    }
+}
+
 // 处理命令
 void shell_process_command(const char* input) {
     if (shell_strlen(input) == 0) return;
@@ -110,35 +377,150 @@ void shell_main(void) {
     
     while (1) {
         // 轮询键盘输入
-        unsigned char scancode = keyboard_read_scancode();
-        if (scancode == 0) {
-            continue; // 没有输入，继续轮询
-        }
+        keyboard_read_scancode();
         
-        // 转换为ASCII字符
-        char c = keyboard_scancode_to_ascii(scancode);
-        if (c == 0) {
-            continue; // 不是可打印字符，继续轮询
-        }
-        
-        if (c == '\n' || c == '\r') {
-            // 回车键 - 处理命令
-            print_char('\n');
-            input_buffer[buffer_pos] = '\0';
-            shell_process_command(input_buffer);
-            buffer_pos = 0;
-            shell_print_prompt();
-        } else if (c == '\b') {
-            // 退格键
-            if (buffer_pos > 0) {
-                buffer_pos--;
-                print_char('\b');  // print_char现在会自动处理退格显示
+        // 优先处理组合键事件（避免与普通字符冲突）
+        int combo_processed = 0;
+        if (keyboard_has_combo_event()) {
+            combo_event_t event = keyboard_get_combo_event();
+            
+            if (event.type == COMBO_EVENT_KEY_DOWN) {
+                // 检查是否是Ctrl组合键，但排除单独的修饰键
+                uint8_t modifiers = keyboard_get_modifier_state();
+                if ((modifiers & 0x02) && // Ctrl键被按下
+                    event.scancode != KEY_CTRL && // 不是Ctrl键本身
+                    event.scancode != KEY_SHIFT_LEFT && // 不是左Shift键
+                    event.scancode != KEY_SHIFT_RIGHT && // 不是右Shift键
+                    event.scancode != KEY_ALT) { // 不是Alt键
+                    uint8_t sequence[1] = {event.scancode};
+                    shell_handle_combo_sequence(sequence, 1, modifiers);
+                    combo_processed = 1; // 标记组合键已处理
+                    
+                    // 清空键盘字符缓冲区，防止组合键对应的普通字符被重复处理
+                    while (keyboard_has_char()) {
+                        keyboard_get_char(); // 丢弃字符
+                    }
+                }
             }
-        } else if (c >= 32 && c <= 126) {
-            // 可打印字符
-            if (buffer_pos < SHELL_BUFFER_SIZE - 1) {
-                input_buffer[buffer_pos++] = c;
-                print_char(c);
+        }
+        
+        // 处理普通字符（仅在组合键未处理时）
+        if (!combo_processed && keyboard_has_char()) {
+            char c = keyboard_get_char();
+            
+            if (c == '\n' || c == '\r') {
+                // 回车键 - 处理命令
+                print_char('\n');
+                input_buffer[buffer_pos] = '\0';
+                shell_process_command(input_buffer);
+                buffer_pos = 0;
+                cursor_pos = 0;
+                keyboard_reset_combo_state();
+                shell_print_prompt();
+            } else if (c == '\b') {
+                // 退格键
+                if (cursor_pos > 0) {
+                    cursor_pos--;
+                    // 移动字符
+                    for (int i = cursor_pos; i < buffer_pos; i++) {
+                        input_buffer[i] = input_buffer[i + 1];
+                    }
+                    buffer_pos--;
+                    // 重新显示剩余字符
+                    print_char('\b');
+                    for (int i = cursor_pos; i < buffer_pos; i++) {
+                        print_char(input_buffer[i]);
+                    }
+                    print_char(' ');
+                    for (int i = cursor_pos; i <= buffer_pos; i++) {
+                        print_char('\b');
+                    }
+                }
+                keyboard_reset_combo_state();
+            } else if (c >= 32 && c <= 126) {
+                // 可打印字符
+                if (buffer_pos < SHELL_BUFFER_SIZE - 1) {
+                    // 如果有字符在光标后面，需要移动它们
+                    if (cursor_pos < buffer_pos) {
+                        for (int i = buffer_pos; i > cursor_pos; i--) {
+                            input_buffer[i] = input_buffer[i - 1];
+                        }
+                    }
+                    input_buffer[cursor_pos] = c;
+                    buffer_pos++;
+                    cursor_pos++;
+                    
+                    // 显示字符和后面的字符
+                    print_char(c);
+                    for (int i = cursor_pos; i < buffer_pos; i++) {
+                        print_char(input_buffer[i]);
+                    }
+                    // 移动光标回正确位置
+                    for (int i = cursor_pos; i < buffer_pos; i++) {
+                        print_char('\b');
+                    }
+                }
+                keyboard_reset_combo_state();
+            }
+        }
+        
+        // 备用的简化组合键检测（保持兼容性）
+        if (!combo_processed && keyboard_is_ctrl_pressed() && keyboard_has_char()) {
+            char c = keyboard_get_char();
+            
+            // 检查是否是控制字符（ASCII 1-31）
+            if (c >= 1 && c <= 31) {
+                // 将控制字符转换为扫描码
+                uint8_t scancode = c + 0x1E; // 简单的映射
+                
+                // 显示控制字符
+                shell_display_control_char(scancode);
+                
+                // 处理组合键
+                switch (c) {
+                    case 3:  // Ctrl+C
+                        print_char('\n');
+                        buffer_pos = 0;
+                        cursor_pos = 0;
+                        shell_print_prompt();
+                        break;
+                    case 12: // Ctrl+L
+                        print_char('\n');
+                        clear_screen();
+                        shell_print_prompt();
+                        break;
+                    case 21: // Ctrl+U
+                        print_string(" - Delete to beginning of line\n");
+                        if (cursor_pos > 0) {
+                            for (int i = 0; i < cursor_pos; i++) {
+                                print_char('\b');
+                            }
+                            int chars_to_delete = cursor_pos;
+                            for (int i = 0; i < chars_to_delete; i++) {
+                                print_char(' ');
+                            }
+                            for (int i = 0; i < chars_to_delete; i++) {
+                                print_char('\b');
+                            }
+                            for (int i = cursor_pos; i < buffer_pos; i++) {
+                                input_buffer[i - cursor_pos] = input_buffer[i];
+                                print_char(input_buffer[i]);
+                            }
+                            for (int i = buffer_pos; i > buffer_pos - cursor_pos; i--) {
+                                print_char(' ');
+                            }
+                            for (int i = buffer_pos; i > buffer_pos - cursor_pos; i--) {
+                                print_char('\b');
+                            }
+                            buffer_pos -= cursor_pos;
+                            cursor_pos = 0;
+                        }
+                        shell_print_prompt();
+                        break;
+                    default:
+                        print_string(" - Unknown control sequence\n");
+                        break;
+                }
             }
         }
     }
@@ -147,6 +529,7 @@ void shell_main(void) {
 // Shell初始化
 void shell_init(void) {
     buffer_pos = 0;
+    cursor_pos = 0;
     
     // 初始化键盘驱动
     keyboard_init();
