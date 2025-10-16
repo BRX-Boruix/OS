@@ -4,14 +4,25 @@
 #include "kernel/kernel.h"
 #include "drivers/display.h"
 #include "drivers/cmos.h"
+#include "kernel/memory.h"
 
-// 内核主函数 - 现在接受multiboot参数
-void kernel_main(unsigned int magic, unsigned int multiboot_info) {
+// 内核主函数 - 接受multiboot参数，支持双架构
+#ifdef __x86_64__
+void kernel_main(uint32_t magic, uint64_t multiboot_info) {
+#else
+void kernel_main(uint32_t magic, uint32_t multiboot_info) {
+#endif
     // 清屏
     clear_screen();
     
     // 显示欢迎信息
-    print_string("Boruix Kernel\n");
+#ifdef __x86_64__
+    print_string("Boruix Kernel (x86_64)\n");
+    print_string("64-bit Long Mode Operating System\n");
+#else
+    print_string("Boruix Kernel (i386)\n");
+    print_string("32-bit Protected Mode Operating System\n");
+#endif
     
     // 显示multiboot信息
     print_string("Multiboot Information:\n");
@@ -27,15 +38,28 @@ void kernel_main(unsigned int magic, unsigned int multiboot_info) {
     if (magic == 0x2BADB002) {
         print_string("- Magic: 0x2BADB002 (Valid)\n");
         print_string("- Multiboot Info: 0x");
+#ifdef __x86_64__
+        // 64位地址显示
+        uint64_t val64 = multiboot_info;
+        for (int i = 15; i >= 0; i--) {
+            print_char(hex[(val64 >> (i * 4)) & 0xF]);
+        }
+#else
+        // 32位地址显示
         val = multiboot_info;
         for (int i = 7; i >= 0; i--) {
             print_char(hex[(val >> (i * 4)) & 0xF]);
         }
+#endif
         print_string("\n");
     } else {
         print_string("- Magic: Invalid multiboot magic\n");
         print_string("- Expected: 0x2BADB002\n");
     }
+    print_string("\n");
+    
+    // 暂时跳过内存管理以确保基本启动
+    print_string("Memory management: DISABLED (for debugging)\n");
     print_string("\n");
     
     // 简单的交互循环
