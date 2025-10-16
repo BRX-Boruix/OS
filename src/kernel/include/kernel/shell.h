@@ -29,6 +29,9 @@ void cmd_time(int argc, char* argv[]);
 void cmd_info(int argc, char* argv[]);
 void cmd_reboot(int argc, char* argv[]);
 
+// 系统控制函数
+void reboot_system(void);
+
 // 字符串工具函数
 int shell_strcmp(const char* str1, const char* str2);
 int shell_strlen(const char* str);
