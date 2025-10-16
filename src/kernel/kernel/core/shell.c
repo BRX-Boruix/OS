@@ -132,9 +132,7 @@ void shell_main(void) {
             // 退格键
             if (buffer_pos > 0) {
                 buffer_pos--;
-                print_char('\b');
-                print_char(' ');
-                print_char('\b');
+                print_char('\b');  // print_char现在会自动处理退格显示
             }
         } else if (c >= 32 && c <= 126) {
             // 可打印字符
