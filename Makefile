@@ -1,28 +1,46 @@
 # Makefile for Boruix OS
-# 支持i386架构，使用NASM和GCC
+# 支持i386和x86_64双架构，使用NASM和GCC
 # 重新组织的项目结构
+
+# 架构选择 (默认i386，可通过 make ARCH=x86_64 切换)
+ARCH ?= i386
 
 # 编译器设置
 AS = nasm
 CC = gcc
 LD = ld
 
-# 编译标志
-ASFLAGS = -f elf32
-CFLAGS = -m32 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra
-LDFLAGS = -m elf_i386 -T $(BUILD_DIR)/linker.ld
+# 架构相关设置
+ifeq ($(ARCH),x86_64)
+    # x86_64 编译标志
+    ASFLAGS = -f elf64
+    CFLAGS = -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic
+    LDFLAGS = -m elf_x86_64 -T $(BUILD_ARCH_DIR)/linker.ld
+    QEMU = qemu-system-x86_64
+    ARCH_DIR = x86_64
+    GRUB_MULTIBOOT = multiboot2
+else
+    # i386 编译标志 (默认)
+    ASFLAGS = -f elf32
+    CFLAGS = -m32 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra
+    LDFLAGS = -m elf_i386 -T $(BUILD_ARCH_DIR)/linker.ld
+    QEMU = qemu-system-i386
+    ARCH_DIR = i386
+    GRUB_MULTIBOOT = multiboot
+endif
 
 # 目录设置
 SRC_DIR = src
 BUILD_DIR = build
+BUILD_ARCH_DIR = $(BUILD_DIR)/$(ARCH)
 CONFIG_DIR = config
 DOCS_DIR = docs
 SCRIPTS_DIR = scripts
 
-# 目标文件
-BOOTLOADER = $(BUILD_DIR)/boot.bin
-KERNEL = $(BUILD_DIR)/kernel.bin
-ISO = $(BUILD_DIR)/boruix.iso
+# 目标文件 (架构相关)
+BOOTLOADER = $(BUILD_ARCH_DIR)/boot.bin
+KERNEL = $(BUILD_ARCH_DIR)/kernel.bin
+ISO = $(BUILD_ARCH_DIR)/boruix-$(ARCH).iso
 
 # 源文件
 BOOTLOADER_SRC = $(SRC_DIR)/boot/boot.asm
@@ -31,9 +49,37 @@ KERNEL_SRCS = $(SRC_DIR)/kernel/kernel/core/main.c \
               $(SRC_DIR)/kernel/drivers/display/display.c \
               $(SRC_DIR)/kernel/drivers/cmos/cmos.c \
               $(SRC_DIR)/kernel/drivers/keyboard/keyboard.c \
-              $(SRC_DIR)/kernel/arch/i386/interrupts/interrupt.c
-LINKER_SCRIPT = $(SRC_DIR)/kernel/arch/i386/boot/linker.ld
-KERNEL_OBJS = $(BUILD_DIR)/main.o $(BUILD_DIR)/multiboot.o $(BUILD_DIR)/display.o $(BUILD_DIR)/cmos.o $(BUILD_DIR)/keyboard.o $(BUILD_DIR)/interrupt.o
+              $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupts/interrupt.c \
+              $(SRC_DIR)/kernel/memory/memory_common.c
+
+# 架构特定的内存管理
+ifeq ($(ARCH),x86_64)
+    KERNEL_SRCS += $(SRC_DIR)/kernel/memory/memory_x86_64.c
+else
+    KERNEL_SRCS += $(SRC_DIR)/kernel/memory/memory_i386.c
+endif
+
+# 架构特定的汇编文件
+ifeq ($(ARCH),x86_64)
+    KERNEL_ASM_SRCS = $(SRC_DIR)/kernel/arch/x86_64/boot/start.asm
+    KERNEL_ASM_OBJS = $(BUILD_ARCH_DIR)/start.o
+else
+    KERNEL_ASM_SRCS = 
+    KERNEL_ASM_OBJS = 
+endif
+
+LINKER_SCRIPT = $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/linker.ld
+# 基础对象文件
+KERNEL_BASE_OBJS = $(BUILD_ARCH_DIR)/main.o $(BUILD_ARCH_DIR)/multiboot.o $(BUILD_ARCH_DIR)/display.o $(BUILD_ARCH_DIR)/cmos.o $(BUILD_ARCH_DIR)/keyboard.o $(BUILD_ARCH_DIR)/interrupt.o $(BUILD_ARCH_DIR)/memory_common.o
+
+# 架构特定的对象文件
+ifeq ($(ARCH),x86_64)
+    KERNEL_ARCH_OBJS = $(BUILD_ARCH_DIR)/memory_x86_64.o
+else
+    KERNEL_ARCH_OBJS = $(BUILD_ARCH_DIR)/memory_i386.o
+endif
+
+KERNEL_OBJS = $(KERNEL_BASE_OBJS) $(KERNEL_ARCH_OBJS) $(KERNEL_ASM_OBJS)
 
 # 默认目标
 all: $(ISO)
@@ -42,73 +88,112 @@ all: $(ISO)
 rebuild: clean all
 
 # 确保构建目录存在
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+$(BUILD_ARCH_DIR):
+	mkdir -p $(BUILD_ARCH_DIR)
 
 # 复制链接器脚本到构建目录
-$(BUILD_DIR)/linker.ld: $(LINKER_SCRIPT) | $(BUILD_DIR)
+$(BUILD_ARCH_DIR)/linker.ld: $(LINKER_SCRIPT) | $(BUILD_ARCH_DIR)
 	cp $< $@
 
 # 编译引导加载程序
-$(BOOTLOADER): $(BOOTLOADER_SRC) | $(BUILD_DIR)
+$(BOOTLOADER): $(BOOTLOADER_SRC) | $(BUILD_ARCH_DIR)
 	$(AS) -f bin -o $@ $<
 
 # 编译内核对象文件
-$(BUILD_DIR)/main.o: $(SRC_DIR)/kernel/kernel/core/main.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/kernel/include -c -o $@ $<
+$(BUILD_ARCH_DIR)/main.o: $(SRC_DIR)/kernel/kernel/core/main.c | $(BUILD_ARCH_DIR)
+	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
 
-$(BUILD_DIR)/multiboot.o: $(SRC_DIR)/kernel/kernel/core/multiboot.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/kernel/include -c -o $@ $<
+$(BUILD_ARCH_DIR)/multiboot.o: $(SRC_DIR)/kernel/kernel/core/multiboot.c | $(BUILD_ARCH_DIR)
+	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
 
-$(BUILD_DIR)/display.o: $(SRC_DIR)/kernel/drivers/display/display.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/kernel/include -c -o $@ $<
+$(BUILD_ARCH_DIR)/display.o: $(SRC_DIR)/kernel/drivers/display/display.c | $(BUILD_ARCH_DIR)
+	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
 
-$(BUILD_DIR)/cmos.o: $(SRC_DIR)/kernel/drivers/cmos/cmos.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/kernel/include -c -o $@ $<
+$(BUILD_ARCH_DIR)/cmos.o: $(SRC_DIR)/kernel/drivers/cmos/cmos.c | $(BUILD_ARCH_DIR)
+	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
 
-$(BUILD_DIR)/keyboard.o: $(SRC_DIR)/kernel/drivers/keyboard/keyboard.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/kernel/include -c -o $@ $<
+$(BUILD_ARCH_DIR)/keyboard.o: $(SRC_DIR)/kernel/drivers/keyboard/keyboard.c | $(BUILD_ARCH_DIR)
+	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
 
-$(BUILD_DIR)/interrupt.o: $(SRC_DIR)/kernel/arch/i386/interrupts/interrupt.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/kernel/include -c -o $@ $<
+$(BUILD_ARCH_DIR)/interrupt.o: $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupts/interrupt.c | $(BUILD_ARCH_DIR)
+	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
+
+# 内存管理模块编译
+$(BUILD_ARCH_DIR)/memory_common.o: $(SRC_DIR)/kernel/memory/memory_common.c | $(BUILD_ARCH_DIR)
+	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
+
+$(BUILD_ARCH_DIR)/memory_x86_64.o: $(SRC_DIR)/kernel/memory/memory_x86_64.c | $(BUILD_ARCH_DIR)
+	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
+
+$(BUILD_ARCH_DIR)/memory_i386.o: $(SRC_DIR)/kernel/memory/memory_i386.c | $(BUILD_ARCH_DIR)
+	$(CC) $(CFLAGS) -D__$(ARCH)__ -I$(SRC_DIR)/kernel/include -c -o $@ $<
+
+# x86_64汇编文件编译
+ifeq ($(ARCH),x86_64)
+$(BUILD_ARCH_DIR)/start.o: $(SRC_DIR)/kernel/arch/x86_64/boot/start.asm | $(BUILD_ARCH_DIR)
+	$(AS) $(ASFLAGS) -o $@ $<
+endif
 
 # 链接内核
-$(KERNEL): $(KERNEL_OBJS) $(BUILD_DIR)/linker.ld
+$(KERNEL): $(KERNEL_OBJS) $(BUILD_ARCH_DIR)/linker.ld
 	$(LD) $(LDFLAGS) -o $@ $(KERNEL_OBJS)
 
 # 创建ISO镜像
-$(ISO): $(BOOTLOADER) $(KERNEL) | $(BUILD_DIR)
-	@echo "Creating ISO image..."
-	@mkdir -p $(BUILD_DIR)/iso/boot/grub
-	@cp $(KERNEL) $(BUILD_DIR)/iso/boot/
-	@echo "menuentry 'Boruix' {" > $(BUILD_DIR)/iso/boot/grub/grub.cfg
-	@echo "    multiboot /boot/kernel.bin" >> $(BUILD_DIR)/iso/boot/grub/grub.cfg
-	@echo "    boot" >> $(BUILD_DIR)/iso/boot/grub/grub.cfg
-	@echo "}" >> $(BUILD_DIR)/iso/boot/grub/grub.cfg
-	grub-mkrescue -o $@ $(BUILD_DIR)/iso/
-	@echo "ISO image created: $(ISO)"
+$(ISO): $(BOOTLOADER) $(KERNEL) | $(BUILD_ARCH_DIR)
+	@echo "Creating $(ARCH) ISO image..."
+	@mkdir -p $(BUILD_ARCH_DIR)/iso/boot/grub
+	@cp $(KERNEL) $(BUILD_ARCH_DIR)/iso/boot/
+	@echo "menuentry 'Boruix OS ($(ARCH))' {" > $(BUILD_ARCH_DIR)/iso/boot/grub/grub.cfg
+ifeq ($(ARCH),x86_64)
+	@echo "    multiboot /boot/kernel.bin" >> $(BUILD_ARCH_DIR)/iso/boot/grub/grub.cfg
+else
+	@echo "    $(GRUB_MULTIBOOT) /boot/kernel.bin" >> $(BUILD_ARCH_DIR)/iso/boot/grub/grub.cfg
+endif
+	@echo "    boot" >> $(BUILD_ARCH_DIR)/iso/boot/grub/grub.cfg
+	@echo "}" >> $(BUILD_ARCH_DIR)/iso/boot/grub/grub.cfg
+	grub-mkrescue -o $@ $(BUILD_ARCH_DIR)/iso/
+	@echo "$(ARCH) ISO image created: $(ISO)"
 
-# 清理
+# 架构特定清理
 clean:
-	rm -f $(BUILD_DIR)/*.bin $(BUILD_DIR)/*.o $(BUILD_DIR)/linker.ld
-	rm -rf $(BUILD_DIR)/iso/
+	rm -f $(BUILD_ARCH_DIR)/*.bin $(BUILD_ARCH_DIR)/*.o $(BUILD_ARCH_DIR)/linker.ld
+	rm -rf $(BUILD_ARCH_DIR)/iso/
 	rm -f $(ISO)
 
-# 深度清理（包括构建目录）
-distclean: clean
+# 清理所有架构
+clean-all:
 	rm -rf $(BUILD_DIR)
+
+# 深度清理（包括构建目录）
+distclean: clean-all
 
 # 运行虚拟机
 run: $(ISO)
-	qemu-system-i386 -cdrom $(ISO) -boot d
+	$(QEMU) -cdrom $(ISO) -boot d
 
 # 运行虚拟机（使用软盘）
 run-floppy: $(BOOTLOADER)
-	qemu-system-i386 -fda $(BOOTLOADER)
+	$(QEMU) -fda $(BOOTLOADER)
+
+# 构建所有架构
+build-all:
+	@echo "Building i386 version..."
+	$(MAKE) ARCH=i386 all
+	@echo "Building x86_64 version..."
+	$(MAKE) ARCH=x86_64 all
+
+# 显示当前架构信息
+info:
+	@echo "Current architecture: $(ARCH)"
+	@echo "Compiler flags: $(CFLAGS)"
+	@echo "Linker flags: $(LDFLAGS)"
+	@echo "QEMU: $(QEMU)"
+	@echo "Build directory: $(BUILD_ARCH_DIR)"
+	@echo "ISO file: $(ISO)"
 
 # 显示项目结构
 tree:
-	@echo "Boruix OS 项目结构:"
+	@echo "Boruix OS 项目结构 (支持双架构):"
 	@echo "├── src/"
 	@echo "│   ├── boot/"
 	@echo "│   │   └── boot.asm"
@@ -119,6 +204,7 @@ tree:
 	@echo "│       │   │   └── types.h"
 	@echo "│       │   ├── arch/"
 	@echo "│       │   │   ├── i386.h"
+	@echo "│       │   │   ├── x86_64.h"
 	@echo "│       │   │   └── interrupt.h"
 	@echo "│       │   └── drivers/"
 	@echo "│       │       ├── keyboard.h"
@@ -129,42 +215,45 @@ tree:
 	@echo "│       │       └── main.c"
 	@echo "│       ├── drivers/"
 	@echo "│       │   ├── keyboard/"
-	@echo "│       │   │   └── keyboard.c"
 	@echo "│       │   ├── display/"
-	@echo "│       │   │   └── display.c"
 	@echo "│       │   └── cmos/"
-	@echo "│       │       └── cmos.c"
 	@echo "│       └── arch/"
-	@echo "│           └── i386/"
+	@echo "│           ├── i386/"
+	@echo "│           │   ├── boot/"
+	@echo "│           │   └── interrupts/"
+	@echo "│           └── x86_64/"
 	@echo "│               ├── boot/"
-	@echo "│               │   ├── start.asm"
-	@echo "│               │   └── linker.ld"
 	@echo "│               └── interrupts/"
-	@echo "│                   └── interrupt.c"
 	@echo "├── build/"
-	@echo "│   ├── *.bin (编译后的文件)"
-	@echo "│   ├── *.o (目标文件)"
-	@echo "│   └── boruix.iso"
-	@echo "├── config/"
-	@echo "│   └── grub.cfg"
-	@echo "├── docs/"
-	@echo "│   └── README.md"
-	@echo "├── scripts/"
+	@echo "│   ├── i386/ (32位构建文件)"
+	@echo "│   └── x86_64/ (64位构建文件)"
 	@echo "└── Makefile"
 
 # 显示帮助
 help:
-	@echo "Available targets:"
-	@echo "  all        - Build the complete ISO image"
-	@echo "  rebuild    - Force rebuild (clean + build)"
-	@echo "  $(BUILD_DIR)/boot.bin - Build bootloader"
-	@echo "  $(BUILD_DIR)/kernel.bin - Build kernel"
-	@echo "  $(ISO)     - Build ISO image"
-	@echo "  clean      - Clean build files"
-	@echo "  distclean  - Clean build directory"
-	@echo "  run        - Run in QEMU with ISO"
-	@echo "  run-floppy - Run in QEMU with floppy"
-	@echo "  tree       - Show project structure"
-	@echo "  help       - Show this help"
+	@echo "Boruix OS 双架构构建系统"
+	@echo ""
+	@echo "架构选择:"
+	@echo "  make ARCH=i386 [target]   - 构建32位版本 (默认)"
+	@echo "  make ARCH=x86_64 [target] - 构建64位版本"
+	@echo ""
+	@echo "可用目标:"
+	@echo "  all        - 构建完整的ISO镜像"
+	@echo "  rebuild    - 强制重新构建"
+	@echo "  build-all  - 构建所有架构版本"
+	@echo "  clean      - 清理当前架构构建文件"
+	@echo "  clean-all  - 清理所有架构构建文件"
+	@echo "  distclean  - 深度清理"
+	@echo "  run        - 在QEMU中运行ISO"
+	@echo "  run-floppy - 在QEMU中运行软盘"
+	@echo "  info       - 显示当前架构信息"
+	@echo "  tree       - 显示项目结构"
+	@echo "  help       - 显示此帮助"
+	@echo ""
+	@echo "示例:"
+	@echo "  make                    # 构建i386版本"
+	@echo "  make ARCH=x86_64 all    # 构建x86_64版本"
+	@echo "  make build-all          # 构建两个架构"
+	@echo "  make ARCH=x86_64 run    # 运行64位版本"
 
-.PHONY: all rebuild clean distclean run run-floppy tree help
+.PHONY: all rebuild clean clean-all distclean run run-floppy build-all info tree help

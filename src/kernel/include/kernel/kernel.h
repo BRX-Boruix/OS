@@ -5,9 +5,16 @@
 #define BORUIX_KERNEL_H
 
 #include "kernel/types.h"
-#include "arch/i386.h"
 
-// 函数声明
+// 根据架构包含相应的头文件
+#ifdef __x86_64__
+#include "arch/x86_64.h"
+// 64位内核主函数
+void kernel_main(uint32_t magic, uint64_t multiboot_info);
+#else
+#include "arch/i386.h"
+// 32位内核主函数
 void kernel_main(uint32_t magic, uint32_t multiboot_info);
+#endif
 
 #endif // BORUIX_KERNEL_H
