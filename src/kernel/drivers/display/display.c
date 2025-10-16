@@ -34,6 +34,19 @@ void print_char(char c) {
         cursor_y++;
     } else if (c == '\r') {
         cursor_x = 0;
+    } else if (c == '\b') {
+        // 退格键处理：将光标向左移动一个位置
+        if (cursor_x > 0) {
+            cursor_x--;
+        } else if (cursor_y > 0) {
+            // 如果当前行没有空间，移动到上一行的末尾
+            cursor_y--;
+            cursor_x = SCREEN_WIDTH - 1;
+        }
+        // 清除当前位置的字符
+        int pos = (cursor_y * SCREEN_WIDTH + cursor_x) * 2;
+        video_mem[pos] = ' ';
+        video_mem[pos + 1] = WHITE;
     } else {
         int pos = (cursor_y * SCREEN_WIDTH + cursor_x) * 2;
         video_mem[pos] = c;
