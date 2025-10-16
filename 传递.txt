@@ -1,0 +1,21 @@
+error: no multiboot header found.
+error: you need to load the kernel first.
+
+Press any key to continue...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

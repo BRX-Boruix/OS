@@ -1,0 +1,259 @@
+// 支持multiboot的简单操作系统内核
+// 使用C语言编写，支持i386架构和GRUB引导
+
+// Multiboot头定义
+#define MULTIBOOT_HEADER_MAGIC 0x1BADB002
+#define MULTIBOOT_HEADER_FLAGS 0x00000003
+#define MULTIBOOT_HEADER_CHECKSUM -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
+
+// 定义颜色
+#define BLACK 0
+#define BLUE 1
+#define GREEN 2
+#define CYAN 3
+#define RED 4
+#define MAGENTA 5
+#define BROWN 6
+#define LIGHT_GRAY 7
+#define DARK_GRAY 8
+#define LIGHT_BLUE 9
+#define LIGHT_GREEN 10
+#define LIGHT_CYAN 11
+#define LIGHT_RED 12
+#define LIGHT_MAGENTA 13
+#define YELLOW 14
+#define WHITE 15
+
+// 屏幕参数
+#define SCREEN_WIDTH 80
+#define SCREEN_HEIGHT 25
+#define VIDEO_MEMORY 0xB8000
+
+// CMOS端口定义
+#define CMOS_ADDRESS 0x70
+#define CMOS_DATA 0x71
+
+// CMOS寄存器定义
+#define CMOS_SECOND 0x00
+#define CMOS_MINUTE 0x02
+#define CMOS_HOUR 0x04
+#define CMOS_DAY 0x07
+#define CMOS_MONTH 0x08
+#define CMOS_YEAR 0x09
+
+// 当前光标位置
+int cursor_x = 0;
+int cursor_y = 0;
+
+// Multiboot头结构（必须在文件开头）
+__attribute__((section(".multiboot")))
+const unsigned int multiboot_header[] = {
+    MULTIBOOT_HEADER_MAGIC,
+    MULTIBOOT_HEADER_FLAGS,
+    MULTIBOOT_HEADER_CHECKSUM
+};
+
+// 清屏函数
+void clear_screen() {
+    char* video_mem = (char*)VIDEO_MEMORY;
+    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT * 2; i += 2) {
+        video_mem[i] = ' ';           // 字符
+        video_mem[i + 1] = WHITE;     // 颜色
+    }
+    cursor_x = 0;
+    cursor_y = 0;
+}
+
+// 设置光标位置
+void set_cursor(int x, int y) {
+    cursor_x = x;
+    cursor_y = y;
+}
+
+// 打印字符
+void print_char(char c) {
+    char* video_mem = (char*)VIDEO_MEMORY;
+    
+    if (c == '\n') {
+        cursor_x = 0;
+        cursor_y++;
+    } else if (c == '\r') {
+        cursor_x = 0;
+    } else {
+        int pos = (cursor_y * SCREEN_WIDTH + cursor_x) * 2;
+        video_mem[pos] = c;
+        video_mem[pos + 1] = WHITE;
+        cursor_x++;
+    }
+    
+    // 换行处理
+    if (cursor_x >= SCREEN_WIDTH) {
+        cursor_x = 0;
+        cursor_y++;
+    }
+    
+    // 滚动屏幕
+    if (cursor_y >= SCREEN_HEIGHT) {
+        // 简单的滚动：将所有行向上移动一行
+        for (int y = 0; y < SCREEN_HEIGHT - 1; y++) {
+            for (int x = 0; x < SCREEN_WIDTH; x++) {
+                int src_pos = ((y + 1) * SCREEN_WIDTH + x) * 2;
+                int dst_pos = (y * SCREEN_WIDTH + x) * 2;
+                video_mem[dst_pos] = video_mem[src_pos];
+                video_mem[dst_pos + 1] = video_mem[src_pos + 1];
+            }
+        }
+        
+        // 清空最后一行
+        for (int x = 0; x < SCREEN_WIDTH; x++) {
+            int pos = ((SCREEN_HEIGHT - 1) * SCREEN_WIDTH + x) * 2;
+            video_mem[pos] = ' ';
+            video_mem[pos + 1] = WHITE;
+        }
+        
+        cursor_y = SCREEN_HEIGHT - 1;
+    }
+}
+
+// 打印字符串
+void print_string(const char* str) {
+    while (*str) {
+        print_char(*str);
+        str++;
+    }
+}
+
+// CMOS时钟读取函数
+unsigned char read_cmos(unsigned char reg) {
+    // 选择CMOS寄存器
+    __asm__ volatile ("outb %0, %1" : : "a" (reg), "Nd" (CMOS_ADDRESS));
+    // 读取数据
+    unsigned char data;
+    __asm__ volatile ("inb %1, %0" : "=a" (data) : "Nd" (CMOS_DATA));
+    return data;
+}
+
+// 将BCD码转换为二进制
+unsigned char bcd_to_bin(unsigned char bcd) {
+    return ((bcd >> 4) * 10) + (bcd & 0x0F);
+}
+
+// 读取当前时间
+void get_current_time(unsigned char* hour, unsigned char* minute, unsigned char* second) {
+    *second = bcd_to_bin(read_cmos(CMOS_SECOND));
+    *minute = bcd_to_bin(read_cmos(CMOS_MINUTE));
+    *hour = bcd_to_bin(read_cmos(CMOS_HOUR));
+}
+
+// 读取当前日期
+void get_current_date(unsigned char* day, unsigned char* month, unsigned char* year) {
+    *day = bcd_to_bin(read_cmos(CMOS_DAY));
+    *month = bcd_to_bin(read_cmos(CMOS_MONTH));
+    *year = bcd_to_bin(read_cmos(CMOS_YEAR));
+}
+
+// 打印两位数（补零）
+void print_two_digits(unsigned char num) {
+    // 打印十位数
+    if (num >= 10) {
+        print_char('0' + (num / 10));
+    } else {
+        print_char('0');
+    }
+    // 打印个位数
+    print_char('0' + (num % 10));
+}
+
+// 打印当前时间
+void print_current_time() {
+    unsigned char hour, minute, second;
+    unsigned char day, month, year;
+    
+    get_current_time(&hour, &minute, &second);
+    get_current_date(&day, &month, &year);
+    
+    // 打印日期
+    print_two_digits(day);
+    print_char('/');
+    print_two_digits(month);
+    print_char('/');
+    print_two_digits(year);
+    print_char(' ');
+    
+    // 打印时间
+    print_two_digits(hour);
+    print_char(':');
+    print_two_digits(minute);
+    print_char(':');
+    print_two_digits(second);
+}
+
+// 简单的延迟函数
+void delay(int count) {
+    for (volatile int i = 0; i < count; i++) {
+        // 空循环
+    }
+}
+
+// 内核主函数 - 现在接受multiboot参数
+void kernel_main(unsigned int magic, unsigned int multiboot_info) {
+    // 清屏
+    clear_screen();
+    
+    // 显示欢迎信息
+    print_string("=== Boruix Kernel ===\n");
+    print_string("Welcome to Boruix operating system!\n");
+    print_string("This kernel supports GRUB multiboot and runs on i386.\n\n");
+    
+    // 显示multiboot信息
+    print_string("Multiboot Information:\n");
+    if (magic == 0x2BADB002) {
+        print_string("- Magic: 0x2BADB002 (Valid)\n");
+        print_string("- Multiboot Info: 0x");
+        // 简单的十六进制显示
+        char hex[] = "0123456789ABCDEF";
+        unsigned int val = multiboot_info;
+        for (int i = 7; i >= 0; i--) {
+            print_char(hex[(val >> (i * 4)) & 0xF]);
+        }
+        print_string("\n");
+    } else {
+        print_string("- Magic: Invalid multiboot magic\n");
+    }
+    print_string("\n");
+    
+    // 显示系统信息
+    print_string("System Information:\n");
+    print_string("- Architecture: i386\n");
+    print_string("- Bootloader: GRUB Multiboot\n");
+    print_string("- Kernel: C Language\n");
+    print_string("- Memory: Protected Mode\n");
+    print_string("- Video: VGA Text Mode\n\n");
+    
+    // 简单的交互循环
+    print_string("Kernel is running... System ready!\n");
+    
+    // 显示一个简单的动画
+    for (int i = 0; i < 10; i++) {
+        print_string(".");
+        delay(1000000);
+    }
+    
+    print_string("\n\nKernel initialization complete!\n");
+    print_string("Boruix is now running successfully!\n");
+    print_string("Current BIOS time:\n");
+    
+    // 显示初始时间
+    print_current_time();
+    print_string("\n");
+    
+    // 无限循环保持系统运行 - 每秒显示时间
+    while (1) {
+        // 等待约1秒（根据CPU频率调整）
+        delay(10000000);
+        
+        // 打印当前时间并换行
+        print_current_time();
+        print_string("\n");
+    }
+}
