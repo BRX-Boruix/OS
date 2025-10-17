@@ -50,4 +50,10 @@ typedef struct {
     uint32_t base;
 } __attribute__((packed)) idt_ptr_t;
 
+// 页表相关定义
+#define PAGE_SIZE 4096
+#define PAGE_PRESENT 0x1
+#define PAGE_WRITABLE 0x2
+#define PAGE_USER 0x4
+
 #endif // BORUIX_ARCH_I386_H

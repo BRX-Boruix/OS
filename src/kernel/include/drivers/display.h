@@ -13,4 +13,8 @@ void print_char(char c);
 void print_string(const char* str);
 void delay(int count);
 
+// 辅助打印函数
+void print_hex(uint32_t value);
+void print_dec(uint32_t value);
+
 #endif // BORUIX_DISPLAY_H
