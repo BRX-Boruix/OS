@@ -3,6 +3,7 @@
 #include "kernel/types.h"
 #include "drivers/display.h"
 #include "drivers/timer.h"
+#include "drivers/keyboard.h"
 
 extern void pic_send_eoi(uint8_t irq);
 
@@ -86,7 +87,7 @@ void irq_handler(registers_t* regs) {
             break;
             
         case 1:  // IRQ1 - Keyboard
-            // TODO: 键盘中断处理
+            keyboard_irq_handler();
             break;
             
         default:

@@ -92,6 +92,7 @@ typedef struct {
 // 键盘函数声明
 void keyboard_init(void);
 void keyboard_interrupt_handler(void);
+void keyboard_irq_handler(void);  // 键盘中断处理程序
 uint8_t keyboard_read_scancode(void);
 uint8_t keyboard_scancode_to_ascii(uint8_t scancode);
 uint8_t keyboard_get_char(void);
