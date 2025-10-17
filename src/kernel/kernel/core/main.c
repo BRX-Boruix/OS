@@ -28,9 +28,9 @@ static void print_hex64(uint64_t value) {
 static void show_boot_info(uint32_t magic, uintptr_t multiboot_info) {
     // 显示欢迎信息
 #ifdef __x86_64__
-    print_string("Boruix OS x86_64 - 64-bit Kernel\n");
+    print_string("BORUIX KERNEL x86_64\n");
 #else
-    print_string("Boruix OS i386 - 32-bit Kernel\n");
+    print_string("BORUIX KERNEL i386\n");
 #endif
     print_string("========================================\n\n");
     
@@ -66,22 +66,29 @@ void kernel_main(uint32_t magic, uint32_t multiboot_info) {
     // 显示启动信息
     show_boot_info(magic, multiboot_info);
     
-    // 系统初始化
-    print_string("System Initialization:\n");
-    print_string("- Display driver: OK\n");
-    print_string("- CMOS driver: OK\n");
-    print_string("- Memory management: DISABLED (debug mode)\n");
-    print_string("- Kernel shell: Initializing...\n");
-    print_string("\n");
-    
     // 显示当前时间
     print_string("Current time: ");
     print_current_time();
     print_string("\n\n");
     
-    print_string("Boruix OS is ready!\n");
-    print_string("Type 'help' for available commands.\n\n");
-    
+    print_string("Ready\n");
+
+    // 等待3秒，每秒输出动画（使用实际CMOS时间，禁止写死）
+    for (int i = 0; i < 3; i++) {
+        print_string("Loading");
+        for (int j = 0; j <= i; j++) {
+            print_char('.');
+        }
+        print_string("\r");  // 回到行首，覆盖动画
+        uint8_t sec_origin = read_cmos(0x00);
+        uint8_t sec_cur;
+        do {
+            sec_cur = read_cmos(0x00);
+        } while (sec_cur == sec_origin);
+    }
+    print_string("Done\n");
+    clear_screen();
+
     // 启动shell
     shell_main();
 }
