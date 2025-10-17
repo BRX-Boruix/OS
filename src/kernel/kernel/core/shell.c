@@ -2,6 +2,7 @@
 // 使用模块化的设计
 
 #include "kernel/shell.h"
+#include "kernel/interrupt.h"
 #include "drivers/display.h"
 #include "drivers/keyboard.h"
 #include "../shell/utils/string.h"
@@ -317,6 +318,7 @@ void shell_main(void) {
 }
 
 // Shell初始化
+// Shell初始化函数
 void shell_init(void) {
     buffer_pos = 0;
     cursor_pos = 0;
@@ -324,6 +326,12 @@ void shell_init(void) {
     // 初始化键盘驱动
     keyboard_init();
     
+    // Shell初始化完成，现在可以安全地启用中断
+    print_string("[SHELL] Shell initialized, enabling interrupts...\n");
+    interrupts_enable();
+    print_string("[SHELL] Interrupts enabled\n\n");
+    
+    print_string("========================================\n");
     print_string("Boruix Shell\n");
     print_string("Type 'help' for available commands.\n");
     print_string("\n");
@@ -331,4 +339,5 @@ void shell_init(void) {
     print_string("https://github.com/borui-x/os\n");
     print_string("https://boruix.thelang.cn\n");
     print_string("========================================\n");
+    print_string("\n");
 }

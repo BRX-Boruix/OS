@@ -14,7 +14,11 @@ static shell_command_t commands[] = {
     {"echo", "Echo text", cmd_echo},
     {"time", "Show current time", cmd_time},
     {"info", "Show system information", cmd_info},
+    {"uptime", "Show system uptime", cmd_uptime},
+    {"irqstat", "Show interrupt statistics", cmd_irqstat},
+    {"irqinfo", "Show IRQ configuration", cmd_irqinfo},
     {"reboot", "Reboot system", cmd_reboot},
+    //{"test", "Test command", cmd_test},
     {NULL, NULL, NULL}  // 结束标记
 };
 

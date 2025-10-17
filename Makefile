@@ -52,15 +52,16 @@ KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/*/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/memory/memory_common.c)
 
-# 架构特定的C源文件
-KERNEL_ARCH_SRCS = $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/*/*.c) \
+# 架构特定的C源文件（明确指定子目录避免通配符问题）
+KERNEL_ARCH_SRCS = $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupt/*.c) \
                    $(wildcard $(SRC_DIR)/kernel/memory/memory_$(ARCH).c)
 
 # 合并所有C源文件
 KERNEL_SRCS = $(KERNEL_COMMON_SRCS) $(KERNEL_ARCH_SRCS)
 
 # 自动发现架构特定的汇编文件
-KERNEL_ASM_SRCS = $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/*.asm)
+KERNEL_ASM_SRCS := $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/*.asm) \
+                   $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupt/*.asm)
 
 # 生成对象文件列表
 KERNEL_C_OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_ARCH_DIR)/%.o,$(KERNEL_SRCS))

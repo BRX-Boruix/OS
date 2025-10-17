@@ -11,5 +11,9 @@
 #include "time/time.h"
 #include "info/info.h"
 #include "reboot/reboot.h"
+#include "test/test.h"
+#include "uptime/uptime.h"
+#include "irqstat/irqstat.h"
+#include "irqinfo/irqinfo.h"
 
 #endif // BUILTIN_H

@@ -97,3 +97,32 @@ void delay(int count) {
         // 空循环
     }
 }
+
+// 打印十六进制数
+void print_hex(uint32_t value) {
+    char hex[] = "0123456789ABCDEF";
+    print_string("0x");
+    for (int i = 7; i >= 0; i--) {
+        print_char(hex[(value >> (i * 4)) & 0xF]);
+    }
+}
+
+// 打印十进制数
+void print_dec(uint32_t value) {
+    if (value == 0) {
+        print_char('0');
+        return;
+    }
+    
+    char buffer[16];
+    int i = 0;
+    
+    while (value > 0) {
+        buffer[i++] = '0' + (value % 10);
+        value /= 10;
+    }
+    
+    while (i > 0) {
+        print_char(buffer[--i]);
+    }
+}
