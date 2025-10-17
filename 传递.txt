@@ -1,20 +1,4 @@
-aixiaoji@192:~/yang$ make ARCH=x86_64 run
-gcc -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic -D__x86_64__ -Isrc/kernel/include -c -o build/x86_64/kernel/kernel/core/shell.o src/kernel/kernel/core/shell.c
-gcc -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic -D__x86_64__ -Isrc/kernel/include -c -o build/x86_64/kernel/kernel/core/shell_combo.o src/kernel/kernel/core/shell_combo.c
-gcc -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic -D__x86_64__ -Isrc/kernel/include -c -o build/x86_64/kernel/kernel/core/shell_command.o src/kernel/kernel/core/shell_command.c
-src/kernel/kernel/core/shell_command.c: In function ‘shell_process_command’:
-src/kernel/kernel/core/shell_command.c:25:22: error: ‘SHELL_BUFFER_SIZE’ undeclared (first use in this function)
-   25 |     char temp_buffer[SHELL_BUFFER_SIZE];
-      |                      ^~~~~~~~~~~~~~~~~
-src/kernel/kernel/core/shell_command.c:25:22: note: each undeclared identifier is reported only once for each function it appears in
-src/kernel/kernel/core/shell_command.c:29:16: error: ‘SHELL_MAX_ARGS’ undeclared (first use in this function)
-   29 |     char* argv[SHELL_MAX_ARGS];
-      |                ^~~~~~~~~~~~~~
-src/kernel/kernel/core/shell_command.c:29:11: warning: unused variable ‘argv’ [-Wunused-variable]
-   29 |     char* argv[SHELL_MAX_ARGS];
-      |           ^~~~
-src/kernel/kernel/core/shell_command.c:25:10: warning: unused variable ‘temp_buffer’ [-Wunused-variable]
-   25 |     char temp_buffer[SHELL_BUFFER_SIZE];
-      |          ^~~~~~~~~~~
-make: *** [Makefile:91：build/x86_64/kernel/kernel/core/shell_command.o] 错误 1
-aixiaoji@192:~/yang$
+root@192:/home/aixiaoji/yang# apt install visudo
+错误： 无法定位软件包 visudo
+root@192:/home/aixiaoji/yang# visudo
+bash: visudo: 未找到命令
