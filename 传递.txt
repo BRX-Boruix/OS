@@ -1,21 +1,29 @@
-error: no multiboot header found.
-error: you need to load the kernel first.
-
-Press any key to continue...
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+gcc -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic -D__x86_64__ -Isrc/kernel/include -c -o build/x86_64/kernel/kernel/core/main.o src/kernel/kernel/core/main.c
+In file included from src/kernel/kernel/core/main.c:7:
+src/kernel/include/kernel/memory.h:15:9: warning: "PAGE_PRESENT" redefined
+   15 | #define PAGE_PRESENT    0x001
+      |         ^~~~~~~~~~~~
+In file included from src/kernel/include/kernel/kernel.h:11,
+                 from src/kernel/kernel/core/main.c:4:
+src/kernel/include/arch/x86_64.h:58:9: note: this is the location of the previous definition
+   58 | #define PAGE_PRESENT 0x1
+      |         ^~~~~~~~~~~~
+src/kernel/include/kernel/memory.h:16:9: warning: "PAGE_WRITABLE" redefined
+   16 | #define PAGE_WRITABLE   0x002
+      |         ^~~~~~~~~~~~~
+src/kernel/include/arch/x86_64.h:59:9: note: this is the location of the previous definition
+   59 | #define PAGE_WRITABLE 0x2
+      |         ^~~~~~~~~~~~~
+src/kernel/include/kernel/memory.h:17:9: warning: "PAGE_USER" redefined
+   17 | #define PAGE_USER       0x004
+      |         ^~~~~~~~~
+src/kernel/include/arch/x86_64.h:60:9: note: this is the location of the previous definition
+   60 | #define PAGE_USER 0x4
+      |         ^~~~~~~~~
+src/kernel/kernel/core/main.c: In function ‘kernel_main’:
+src/kernel/kernel/core/main.c:85:29: error: implicit declaration of function ‘cmos_read’ [-Wimplicit-function-declaration]
+   85 |         uint8_t sec_start = cmos_read(0x00); // 当前秒
+      |                             ^~~~~~~~~
+make: *** [Makefile:91：build/x86_64/kernel/kernel/core/main.o] 错误 1
+aixiaoji@192:~/yang$ ^C
+aixiaoji@192:~/yang$

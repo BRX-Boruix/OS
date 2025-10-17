@@ -11,10 +11,7 @@
 #define PAGE_SHIFT 12
 #define PAGE_MASK (~(PAGE_SIZE - 1))
 
-// 页面标志
-#define PAGE_PRESENT    0x001
-#define PAGE_WRITABLE   0x002
-#define PAGE_USER       0x004
+// 页面标志 (在arch/x86_64.h中定义)
 #define PAGE_WRITETHROUGH 0x008
 #define PAGE_CACHE_DISABLE 0x010
 #define PAGE_ACCESSED   0x020

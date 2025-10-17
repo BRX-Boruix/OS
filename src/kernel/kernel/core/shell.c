@@ -15,6 +15,7 @@ static int cursor_pos = 0;  // 光标在输入缓冲区中的位置
 static shell_command_t commands[] = {
     {"help", "Show available commands", cmd_help},
     {"clear", "Clear screen", cmd_clear},
+    {"cls", "Clear screen(alias for clear)", cmd_clear},
     {"echo", "Echo text", cmd_echo},
     {"time", "Show current time", cmd_time},
     {"info", "Show system information", cmd_info},
@@ -534,8 +535,13 @@ void shell_init(void) {
     // 初始化键盘驱动
     keyboard_init();
     
-    print_string("Boruix Shell v1.0\n");
-    print_string("==================\n\n");
+    print_string("Boruix Shell\n");
+    print_string("Type 'help' for available commands.\n");
+    print_string("\n");
+    print_string("========================================\n");
+    print_string("https://github.com/borui-x/os\n");
+    print_string("https://boruix.thelang.cn\n");
+    print_string("========================================\n");
 }
 
 // === 内置命令实现 ===
@@ -543,7 +549,7 @@ void shell_init(void) {
 void cmd_help(int argc, char* argv[]) {
     (void)argc; (void)argv;  // 避免未使用参数警告
     
-    print_string("Available commands:\n");
+    print_string("BORUIX SHELL COMMANDS\n");
     print_string("==================\n");
     
     for (int i = 0; commands[i].name; i++) {
@@ -579,18 +585,14 @@ void cmd_time(int argc, char* argv[]) {
 void cmd_info(int argc, char* argv[]) {
     (void)argc; (void)argv;
     
-    print_string("System Information:\n");
+    print_string("BORUIX SYSTEM INFORMATION\n");
     print_string("==================\n");
 #ifdef __x86_64__
     print_string("Architecture: x86_64 (64-bit)\n");
 #else
     print_string("Architecture: i386 (32-bit)\n");
 #endif
-    print_string("OS: Boruix v1.0\n");
-    print_string("Kernel: Boruix Kernel\n");
-    print_string("Shell: Boruix Shell v1.0\n");
-    print_string("Memory: Basic management (debug mode)\n");
-    print_string("\n");
+    print_string("\n\n");
 }
 
 void cmd_reboot(int argc, char* argv[]) {
