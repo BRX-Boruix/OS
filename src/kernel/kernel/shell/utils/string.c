@@ -1,7 +1,7 @@
 // Boruix OS Shell - 字符串工具函数实现
 // 提供基本的字符串操作功能
 
-#include "shell_string.h"
+#include "string.h"
 #include "kernel/types.h"
 
 // 字符串比较函数

@@ -1,8 +1,8 @@
 // Boruix OS Shell - 命令处理实现
 // 处理命令解析和执行
 
-#include "shell_command.h"
-#include "shell_builtin.h"
+#include "command.h"
+#include "../builtin/builtin.h"
 #include "kernel/shell.h"
 #include "drivers/display.h"
 

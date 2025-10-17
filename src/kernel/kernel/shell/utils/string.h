@@ -1,8 +1,8 @@
 // Boruix OS Shell - 字符串工具函数
 // 提供基本的字符串操作功能
 
-#ifndef SHELL_STRING_H
-#define SHELL_STRING_H
+#ifndef STRING_H
+#define STRING_H
 
 // 字符串比较函数
 int shell_strcmp(const char* str1, const char* str2);
@@ -16,4 +16,4 @@ void shell_strcpy(char* dest, const char* src);
 // 简单的字符串分割函数
 char* shell_strtok(char* str, const char* delim);
 
-#endif // SHELL_STRING_H
+#endif // STRING_H
