@@ -47,6 +47,8 @@ BOOTLOADER_SRC = $(SRC_DIR)/boot/boot.asm
 
 # 自动发现所有C源文件
 KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/kernel/shell/**/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/kernel/shell/**/**/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/*/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/memory/memory_common.c)
 

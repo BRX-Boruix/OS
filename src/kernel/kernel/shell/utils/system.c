@@ -1,7 +1,7 @@
 // Boruix OS Shell - 系统工具函数实现
 // 提供系统级别的功能
 
-#include "shell_system.h"
+#include "system.h"
 #include "drivers/display.h"
 
 // 简单的端口输出函数

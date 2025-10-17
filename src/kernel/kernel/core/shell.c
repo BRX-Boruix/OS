@@ -4,11 +4,11 @@
 #include "kernel/shell.h"
 #include "drivers/display.h"
 #include "drivers/keyboard.h"
-#include "shell_string.h"
-#include "shell_combo.h"
-#include "shell_command.h"
-#include "shell_builtin.h"
-#include "shell_system.h"
+#include "../shell/utils/string.h"
+#include "../shell/utils/combo.h"
+#include "../shell/commands/command.h"
+#include "../shell/builtin/builtin.h"
+#include "../shell/utils/system.h"
 
 // 全局变量
 static char input_buffer[SHELL_BUFFER_SIZE];

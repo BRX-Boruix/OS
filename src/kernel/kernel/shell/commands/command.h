@@ -1,10 +1,10 @@
 // Boruix OS Shell - 命令处理
 // 处理命令解析和执行
 
-#ifndef SHELL_COMMAND_H
-#define SHELL_COMMAND_H
+#ifndef COMMAND_H
+#define COMMAND_H
 
-#include "shell_string.h"
+#include "../utils/string.h"
 
 // 命令函数类型定义
 typedef void (*shell_command_func_t)(int argc, char* argv[]);
@@ -22,4 +22,4 @@ void shell_process_command(const char* input);
 // 获取命令表
 shell_command_t* shell_get_commands(void);
 
-#endif // SHELL_COMMAND_H
+#endif // COMMAND_H

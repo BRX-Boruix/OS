@@ -1,7 +1,7 @@
 // Boruix OS Shell - 组合键处理实现
 // 处理各种键盘组合键功能
 
-#include "shell_combo.h"
+#include "combo.h"
 #include "drivers/display.h"
 
 // 显示控制字符（如^C, ^V等）
