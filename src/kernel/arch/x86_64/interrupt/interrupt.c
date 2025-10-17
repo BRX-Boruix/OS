@@ -23,7 +23,9 @@ void interrupt_init(void) {
     print_dec(TIMER_FREQ_HZ);
     print_string(" Hz)\n");
     
+    // 启用IRQ0（定时器）和IRQ1（键盘）
     pic_clear_mask(0);
+    pic_clear_mask(1);
     
     print_string("[INT] Interrupt system initialized\n");
     // 注意：不自动启用中断，等待shell准备好

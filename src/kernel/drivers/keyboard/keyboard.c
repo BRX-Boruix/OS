@@ -89,6 +89,22 @@ void keyboard_init(void) {
     global_timestamp = 0;
 }
 
+// 键盘中断处理程序
+void keyboard_irq_handler(void) {
+    // 检查数据是否可用
+    if (!(inb(KEYBOARD_STATUS_PORT) & KEYBOARD_STATUS_OUTPUT_BUFFER_FULL)) {
+        return; // 没有数据
+    }
+    
+    // 读取扫描码
+    unsigned char scancode = inb(KEYBOARD_DATA_PORT);
+    
+    // 处理键盘事件
+    process_key_event(scancode);
+    
+    increment_timestamp(); // 增加时间戳
+}
+
 // 读取键盘扫描码（轮询模式，非阻塞）
 unsigned char keyboard_read_scancode(void) {
     // 检查数据是否可用

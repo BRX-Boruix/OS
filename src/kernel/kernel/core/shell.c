@@ -168,8 +168,9 @@ void shell_main(void) {
     shell_print_prompt();
     
     while (1) {
-        // 轮询键盘输入
-        keyboard_read_scancode();
+        // 键盘输入现在通过中断处理，无需轮询
+        // 使用hlt指令让CPU进入空闲状态，等待中断
+        __asm__ volatile("hlt");
         
         // 优先处理组合键事件（避免与普通字符冲突）
         int combo_processed = 0;
