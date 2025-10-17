@@ -1,29 +1,20 @@
-gcc -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic -D__x86_64__ -Isrc/kernel/include -c -o build/x86_64/kernel/kernel/core/main.o src/kernel/kernel/core/main.c
-In file included from src/kernel/kernel/core/main.c:7:
-src/kernel/include/kernel/memory.h:15:9: warning: "PAGE_PRESENT" redefined
-   15 | #define PAGE_PRESENT    0x001
-      |         ^~~~~~~~~~~~
-In file included from src/kernel/include/kernel/kernel.h:11,
-                 from src/kernel/kernel/core/main.c:4:
-src/kernel/include/arch/x86_64.h:58:9: note: this is the location of the previous definition
-   58 | #define PAGE_PRESENT 0x1
-      |         ^~~~~~~~~~~~
-src/kernel/include/kernel/memory.h:16:9: warning: "PAGE_WRITABLE" redefined
-   16 | #define PAGE_WRITABLE   0x002
-      |         ^~~~~~~~~~~~~
-src/kernel/include/arch/x86_64.h:59:9: note: this is the location of the previous definition
-   59 | #define PAGE_WRITABLE 0x2
-      |         ^~~~~~~~~~~~~
-src/kernel/include/kernel/memory.h:17:9: warning: "PAGE_USER" redefined
-   17 | #define PAGE_USER       0x004
-      |         ^~~~~~~~~
-src/kernel/include/arch/x86_64.h:60:9: note: this is the location of the previous definition
-   60 | #define PAGE_USER 0x4
-      |         ^~~~~~~~~
-src/kernel/kernel/core/main.c: In function ‘kernel_main’:
-src/kernel/kernel/core/main.c:85:29: error: implicit declaration of function ‘cmos_read’ [-Wimplicit-function-declaration]
-   85 |         uint8_t sec_start = cmos_read(0x00); // 当前秒
-      |                             ^~~~~~~~~
-make: *** [Makefile:91：build/x86_64/kernel/kernel/core/main.o] 错误 1
-aixiaoji@192:~/yang$ ^C
+aixiaoji@192:~/yang$ make ARCH=x86_64 run
+gcc -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic -D__x86_64__ -Isrc/kernel/include -c -o build/x86_64/kernel/kernel/core/shell.o src/kernel/kernel/core/shell.c
+gcc -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic -D__x86_64__ -Isrc/kernel/include -c -o build/x86_64/kernel/kernel/core/shell_combo.o src/kernel/kernel/core/shell_combo.c
+gcc -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic -D__x86_64__ -Isrc/kernel/include -c -o build/x86_64/kernel/kernel/core/shell_command.o src/kernel/kernel/core/shell_command.c
+src/kernel/kernel/core/shell_command.c: In function ‘shell_process_command’:
+src/kernel/kernel/core/shell_command.c:25:22: error: ‘SHELL_BUFFER_SIZE’ undeclared (first use in this function)
+   25 |     char temp_buffer[SHELL_BUFFER_SIZE];
+      |                      ^~~~~~~~~~~~~~~~~
+src/kernel/kernel/core/shell_command.c:25:22: note: each undeclared identifier is reported only once for each function it appears in
+src/kernel/kernel/core/shell_command.c:29:16: error: ‘SHELL_MAX_ARGS’ undeclared (first use in this function)
+   29 |     char* argv[SHELL_MAX_ARGS];
+      |                ^~~~~~~~~~~~~~
+src/kernel/kernel/core/shell_command.c:29:11: warning: unused variable ‘argv’ [-Wunused-variable]
+   29 |     char* argv[SHELL_MAX_ARGS];
+      |           ^~~~
+src/kernel/kernel/core/shell_command.c:25:10: warning: unused variable ‘temp_buffer’ [-Wunused-variable]
+   25 |     char temp_buffer[SHELL_BUFFER_SIZE];
+      |          ^~~~~~~~~~~
+make: *** [Makefile:91：build/x86_64/kernel/kernel/core/shell_command.o] 错误 1
 aixiaoji@192:~/yang$
