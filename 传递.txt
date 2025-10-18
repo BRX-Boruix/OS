@@ -1,4 +1,0 @@
-root@192:/home/aixiaoji/yang# apt install visudo
-错误： 无法定位软件包 visudo
-root@192:/home/aixiaoji/yang# visudo
-bash: visudo: 未找到命令
