@@ -5,7 +5,15 @@
 #include "drivers/timer.h"
 
 // 外部函数
+#ifdef __x86_64__
 extern uint32_t get_interrupt_count(uint8_t int_no);
+#else
+// i386没有中断系统，提供空实现
+static uint32_t get_interrupt_count(uint8_t int_no) {
+    (void)int_no;
+    return 0;
+}
+#endif
 
 void cmd_irqstat(int argc, char** argv) {
     (void)argc;
