@@ -18,6 +18,7 @@ static shell_command_t commands[] = {
     {"irqstat", "Show interrupt statistics", cmd_irqstat},
     {"irqinfo", "Show IRQ configuration", cmd_irqinfo},
     {"reboot", "Reboot system", cmd_reboot},
+    {"great", "Let the great Yang Borui give you the answer.", cmd_great},
     //{"test", "Test command", cmd_test},
     {NULL, NULL, NULL}  // 结束标记
 };
