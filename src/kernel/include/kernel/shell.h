@@ -6,7 +6,7 @@
 // Shell配置
 #define SHELL_BUFFER_SIZE 256
 #define SHELL_MAX_ARGS 16
-#define SHELL_PROMPT "boruix> "
+#define SHELL_PROMPT "Boruix> "
 
 // Shell函数声明
 void shell_main(void);
