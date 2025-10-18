@@ -4,6 +4,7 @@
 #include "kernel/kernel.h"
 #include "drivers/display.h"
 #include "drivers/cmos.h"
+#include "drivers/timer.h"
 #include "kernel/memory.h"
 #include "kernel/shell.h"
 #include "kernel/interrupt.h"
@@ -54,7 +55,14 @@ void kernel_main(uint32_t magic, uint32_t multiboot_info) {
     print_string("\n\n");
     
     // 初始化中断系统
+    #ifdef __x86_64__
+    // x86_64: 完整中断系统
     interrupt_init();
+    print_string("[INT] x86_64 interrupt system initialized\n");
+    #else
+    // i386: 无中断系统
+    print_string("[INT] i386 running without interrupt system\n");
+    #endif
     print_string("\n");
     
     print_string("Ready\n");

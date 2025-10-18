@@ -168,9 +168,13 @@ void shell_main(void) {
     shell_print_prompt();
     
     while (1) {
-        // 键盘输入现在通过中断处理，无需轮询
-        // 使用hlt指令让CPU进入空闲状态，等待中断
+        #ifdef __x86_64__
+        // x86_64: 使用中断处理
         __asm__ volatile("hlt");
+        #else
+        // i386: 使用轮询模式
+        keyboard_read_scancode();
+        #endif
         
         // 优先处理组合键事件（避免与普通字符冲突）
         int combo_processed = 0;
@@ -327,10 +331,18 @@ void shell_init(void) {
     // 初始化键盘驱动
     keyboard_init();
     
-    // Shell初始化完成，现在可以安全地启用中断
-    print_string("[SHELL] Shell initialized, enabling interrupts...\n");
+    // Shell初始化完成
+    print_string("[SHELL] Shell initialized\n");
+    #ifdef __x86_64__
+    // x86_64: 启用中断
+    print_string("[SHELL] Enabling interrupts (x86_64)...\n");
     interrupts_enable();
-    print_string("[SHELL] Interrupts enabled\n\n");
+    print_string("[SHELL] Interrupts enabled\n");
+    #else
+    // i386: 无中断系统
+    print_string("[SHELL] Running without interrupts (i386)\n");
+    #endif
+    print_string("\n");
     
     print_string("========================================\n");
     print_string("Boruix Shell\n");
