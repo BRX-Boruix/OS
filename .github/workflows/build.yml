@@ -1,0 +1,117 @@
+name: Build Boruix OS
+
+# 在push和pull request时触发构建
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+# 允许手动触发
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    # 构建矩阵：同时构建i386和x86_64架构
+    strategy:
+      matrix:
+        arch: [i386, x86_64]
+    
+    steps:
+    # 检出代码
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    # 安装构建依赖
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          nasm \
+          gcc \
+          binutils \
+          grub-common \
+          grub-pc-bin \
+          xorriso \
+          mtools
+    
+    # 构建指定架构
+    - name: Build for ${{ matrix.arch }}
+      run: |
+        echo "Building for architecture: ${{ matrix.arch }}"
+        make ARCH=${{ matrix.arch }} build-all
+    
+    # 压缩build目录
+    - name: Compress build directory
+      run: |
+        cd build
+        zip -r ../build_${{ matrix.arch }}.zip .
+        cd ..
+        ls -la build_${{ matrix.arch }}.zip
+    
+    # 上传构建产物
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: boruix-build-${{ matrix.arch }}
+        path: build_${{ matrix.arch }}.zip
+        retention-days: 30
+    
+    # 上传ISO文件（如果有的话）
+    - name: Upload ISO files
+      uses: actions/upload-artifact@v4
+      with:
+        name: boruix-iso-${{ matrix.arch }}
+        path: build/${{ matrix.arch }}/*.iso
+        retention-days: 30
+      continue-on-error: true
+    
+    # 显示构建信息
+    - name: Display build info
+      run: |
+        echo "=== Build Summary for ${{ matrix.arch }} ==="
+        echo "Architecture: ${{ matrix.arch }}"
+        echo "Build directory contents:"
+        ls -la build/${{ matrix.arch }}/ || echo "No build directory found"
+        echo "ISO files:"
+        ls -la build/${{ matrix.arch }}/*.iso || echo "No ISO files found"
+        echo "Compressed build size:"
+        ls -lh build_${{ matrix.arch }}.zip || echo "No compressed file found"
+
+  # 合并所有架构的构建产物
+  combine-artifacts:
+    runs-on: ubuntu-latest
+    needs: build
+    
+    steps:
+    - name: Download all build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+    
+    - name: Create combined build archive
+      run: |
+        mkdir -p combined_build
+        # 解压所有架构的构建产物到不同目录
+        for arch in i386 x86_64; do
+          if [ -f "artifacts/boruix-build-$arch/build_$arch.zip" ]; then
+            unzip "artifacts/boruix-build-$arch/build_$arch.zip" -d "combined_build/$arch/"
+          fi
+        done
+        
+        # 创建最终的合并压缩包
+        cd combined_build
+        zip -r ../build.zip .
+        cd ..
+        
+        echo "Combined build archive created:"
+        ls -lh build.zip
+    
+    - name: Upload combined build archive
+      uses: actions/upload-artifact@v4
+      with:
+        name: boruix-build-combined
+        path: build.zip
+        retention-days: 30
