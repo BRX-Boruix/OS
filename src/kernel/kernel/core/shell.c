@@ -349,8 +349,8 @@ void shell_init(void) {
     print_string("Type 'help' for available commands.\n");
     print_string("\n");
     print_string("========================================\n");
-    print_string("https://github.com/borui-x/os\n");
-    print_string("https://boruix.thelang.cn\n");
+    print_string("https://github.com/BRX-Boruix/OS\n");
+    print_string("https://os.boruix.thelang.cn\n");
     print_string("========================================\n");
     print_string("\n");
 }
