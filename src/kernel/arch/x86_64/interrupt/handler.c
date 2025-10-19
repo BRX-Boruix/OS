@@ -53,6 +53,9 @@ void isr_handler(registers_t* regs) {
     interrupt_counts[int_no]++;
     
     if (int_no < 32) {
+        // 禁用中断，防止重入
+        __asm__ volatile("cli");
+        
         print_string("\n========================================\n");
         print_string("[EXCEPTION] ");
         print_string(exception_messages[int_no]);
@@ -64,6 +67,9 @@ void isr_handler(registers_t* regs) {
         print_string("\n");
         print_string("RIP: ");
         print_hex((uint32_t)regs->rip);
+        print_string("\n");
+        print_string("RSP: ");
+        print_hex((uint32_t)regs->rsp);
         print_string("\n");
         print_string("========================================\n");
         
