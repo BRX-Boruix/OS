@@ -143,6 +143,18 @@ void kmain(void) {
         print_string("\nFAILED: Timer still not working\n\n");
     }
     
-    print_string("System halted.\n");
+    // 启用键盘中断
+    print_string("Enabling keyboard interrupt...\n");
+    pic_clear_mask(1);  // Keyboard
+    print_string("Keyboard IRQ enabled!\n\n");
+    
+    print_string("========================================\n");
+    print_string("Starting Shell...\n");
+    print_string("========================================\n\n");
+    
+    // 启动shell
+    extern void shell_main(void);
+    shell_main();
+    
     hcf();
 }
