@@ -4,12 +4,8 @@
 #ifndef BORUIX_INTERRUPT_H
 #define BORUIX_INTERRUPT_H
 
-// 根据架构包含相应的头文件
-#ifdef __x86_64__
+// 包含x86_64架构头文件
 #include "arch/x86_64.h"
-#else
-#include "arch/i386.h"
-#endif
 
 // 中断函数声明
 void interrupt_init(void);

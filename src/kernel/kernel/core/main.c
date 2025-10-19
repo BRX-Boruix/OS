@@ -14,11 +14,7 @@
 // 显示启动信息
 static void show_boot_info(uint32_t magic, uintptr_t multiboot_info) {
     // 显示欢迎信息
-#ifdef __x86_64__
     print_string("BORUIX KERNEL x86_64\n");
-#else
-    print_string("BORUIX KERNEL i386\n");
-#endif
     print_string("========================================\n\n");
     
     // 显示multiboot信息
@@ -37,12 +33,8 @@ static void show_boot_info(uint32_t magic, uintptr_t multiboot_info) {
     print_string("\n");
 }
 
-// 内核主函数 - 接受multiboot参数，支持双架构
-#ifdef __x86_64__
+// 内核主函数 - x86_64架构
 void kernel_main(uint32_t magic, uint64_t multiboot_info) {
-#else
-void kernel_main(uint32_t magic, uint32_t multiboot_info) {
-#endif
     // 初始化显示
     clear_screen();
     
@@ -55,14 +47,7 @@ void kernel_main(uint32_t magic, uint32_t multiboot_info) {
     print_string("\n\n");
     
     // 初始化中断系统
-    #ifdef __x86_64__
-    // x86_64: 完整中断系统
     interrupt_init();
-    print_string("[INT] x86_64 interrupt system initialized\n");
-    #else
-    // i386: 无中断系统
-    print_string("[INT] i386 running without interrupt system\n");
-    #endif
     print_string("\n");
     
     print_string("Ready\n");

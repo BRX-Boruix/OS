@@ -79,7 +79,7 @@ uint64_t get_physical_addr_x86_64(uint64_t virtual_addr);
 
 #else
 
-// i386页表结构
+// 32位页表结构（已废弃，保留定义）
 typedef struct {
     uint32_t present : 1;
     uint32_t writable : 1;
@@ -105,32 +105,15 @@ typedef struct {
 #define KERNEL_HEAP_START_32     0xD0000000
 #define KERNEL_HEAP_END_32       0xE0000000
 
-// 32位内存管理函数
-void memory_init_i386(uint32_t multiboot_info);
-void* kmalloc_i386(size_t size);
-void kfree_i386(void* ptr);
-void* map_page_i386(uint32_t virtual_addr, uint32_t physical_addr, uint32_t flags);
-void unmap_page_i386(uint32_t virtual_addr);
-uint32_t get_physical_addr_i386(uint32_t virtual_addr);
-
 #endif
 
-// 通用内存管理接口
-#ifdef __x86_64__
+// 通用内存管理接口（x86_64）
 #define memory_init(info) memory_init_x86_64(info)
 #define kmalloc(size) kmalloc_x86_64(size)
 #define kfree(ptr) kfree_x86_64(ptr)
 #define map_page(vaddr, paddr, flags) map_page_x86_64(vaddr, paddr, flags)
 #define unmap_page(vaddr) unmap_page_x86_64(vaddr)
 #define get_physical_addr(vaddr) get_physical_addr_x86_64(vaddr)
-#else
-#define memory_init(info) memory_init_i386(info)
-#define kmalloc(size) kmalloc_i386(size)
-#define kfree(ptr) kfree_i386(ptr)
-#define map_page(vaddr, paddr, flags) map_page_i386(vaddr, paddr, flags)
-#define unmap_page(vaddr) unmap_page_i386(vaddr)
-#define get_physical_addr(vaddr) get_physical_addr_i386(vaddr)
-#endif
 
 // 通用函数
 void* memset(void* dest, int value, size_t count);

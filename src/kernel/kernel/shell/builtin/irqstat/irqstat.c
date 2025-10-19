@@ -8,7 +8,7 @@
 #ifdef __x86_64__
 extern uint32_t get_interrupt_count(uint8_t int_no);
 #else
-// i386没有中断系统，提供空实现
+// x86_64中断统计
 static uint32_t get_interrupt_count(uint8_t int_no) {
     (void)int_no;
     return 0;
