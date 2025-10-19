@@ -17,6 +17,8 @@ static shell_command_t commands[] = {
     {"uptime", "Show system uptime", cmd_uptime},
     {"irqstat", "Show interrupt statistics", cmd_irqstat},
     {"irqinfo", "Show IRQ configuration", cmd_irqinfo},
+    {"irqprio", "Manage IRQ priorities", cmd_irqprio},
+    {"irqtest", "Test IRQ priority system", cmd_irqtest},
     {"reboot", "Reboot system", cmd_reboot},
     {"great", "Let the great Yang Borui give you the answer.", cmd_great},
     //{"test", "Test command", cmd_test},

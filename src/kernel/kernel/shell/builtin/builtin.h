@@ -15,6 +15,8 @@
 #include "uptime/uptime.h"
 #include "irqstat/irqstat.h"
 #include "irqinfo/irqinfo.h"
+#include "irqprio/irqprio.h"
+#include "irqtest/irqtest.h"
 #include "great/great.h"
 
 #endif // BUILTIN_H

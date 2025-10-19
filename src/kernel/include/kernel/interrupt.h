@@ -32,4 +32,26 @@ static inline bool interrupts_enabled(void) {
 // 中断初始化函数（由架构特定代码实现）
 void interrupt_init(void);
 
+// 中断优先级管理函数
+void irq_priority_init(void);
+void irq_set_priority(uint8_t irq, uint8_t priority);
+uint8_t irq_get_priority(uint8_t irq);
+bool irq_should_execute(uint8_t irq);
+void irq_enter(uint8_t irq);
+void irq_exit(void);
+uint8_t irq_get_current_level(void);
+uint32_t irq_get_nesting_count(void);
+uint64_t irq_get_blocked_count(uint8_t irq);
+const char* irq_get_priority_name(uint8_t priority);
+void irq_disable(uint8_t irq);
+void irq_enable(uint8_t irq);
+void irq_reset_priorities(void);
+
+// 优先级级别定义
+#define IRQ_PRIORITY_CRITICAL   0
+#define IRQ_PRIORITY_HIGH       1
+#define IRQ_PRIORITY_NORMAL     2
+#define IRQ_PRIORITY_LOW        3
+#define IRQ_PRIORITY_DISABLED   255
+
 #endif // BORUIX_INTERRUPT_H
