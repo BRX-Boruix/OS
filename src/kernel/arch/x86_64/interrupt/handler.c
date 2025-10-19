@@ -80,18 +80,31 @@ void isr_handler(registers_t* regs) {
     }
 }
 
+// 静态标志，防止中断重入
+static volatile int in_irq = 0;
+
 // IRQ处理函数
 void irq_handler(registers_t* regs) {
     uint32_t int_no = (uint32_t)regs->int_no;
+    
+    // 防止重入
+    if (in_irq) {
+        uint8_t irq = int_no - 32;
+        pic_send_eoi(irq);
+        return;
+    }
+    in_irq = 1;
     
     interrupt_counts[int_no]++;
     
     uint8_t irq = int_no - 32;
     
+    // 先发送EOI，避免PIC阻塞
+    pic_send_eoi(irq);
+    
     // 检查优先级，决定是否执行
     if (!irq_should_execute(irq)) {
-        // 中断被阻塞，发送EOI后直接返回
-        pic_send_eoi(irq);
+        in_irq = 0;
         return;
     }
     
@@ -114,7 +127,7 @@ void irq_handler(registers_t* regs) {
     // 退出中断处理
     irq_exit();
     
-    pic_send_eoi(irq);
+    in_irq = 0;
 }
 
 uint64_t get_interrupt_count(uint8_t int_no) {
