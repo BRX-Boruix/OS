@@ -1,33 +1,22 @@
 # Makefile for Boruix OS
-# 支持i386和x86_64双架构，使用NASM和GCC
+# 仅支持x86_64架构，使用NASM和GCC
 # 重新组织的项目结构
 
-# 架构选择 (默认i386，可通过 make ARCH=x86_64 切换)
-ARCH ?= i386
+# 架构选择 (仅支持x86_64)
+ARCH := x86_64
 
 # 编译器设置
 AS = nasm
 CC = gcc
 LD = ld
 
-# 架构相关设置
-ifeq ($(ARCH),x86_64)
-    # x86_64 编译标志
-    ASFLAGS = -f elf64
-    CFLAGS = -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic
-    LDFLAGS = -m elf_x86_64 -T $(BUILD_ARCH_DIR)/linker.ld
-    QEMU = qemu-system-x86_64
-    ARCH_DIR = x86_64
-    GRUB_MULTIBOOT = multiboot2
-else
-    # i386 编译标志 (默认)
-    ASFLAGS = -f elf32
-    CFLAGS = -m32 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra
-    LDFLAGS = -m elf_i386 -T $(BUILD_ARCH_DIR)/linker.ld
-    QEMU = qemu-system-i386
-    ARCH_DIR = i386
-    GRUB_MULTIBOOT = multiboot
-endif
+# 架构相关设置 (仅x86_64)
+ASFLAGS = -f elf64
+CFLAGS = -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic
+LDFLAGS = -m elf_x86_64 -T $(BUILD_ARCH_DIR)/linker.ld
+QEMU = qemu-system-x86_64
+ARCH_DIR = x86_64
+GRUB_MULTIBOOT = multiboot2
 
 # 目录设置
 SRC_DIR = src
@@ -42,8 +31,7 @@ BOOTLOADER = $(BUILD_ARCH_DIR)/boot.bin
 KERNEL = $(BUILD_ARCH_DIR)/kernel.bin
 ISO = $(BUILD_ARCH_DIR)/boruix-$(ARCH).iso
 
-# 自动发现源文件
-BOOTLOADER_SRC = $(SRC_DIR)/boot/boot.asm
+# x86_64引导文件（不需要单独的bootloader，使用GRUB）
 
 # 自动发现所有C源文件
 KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
@@ -84,9 +72,9 @@ $(BUILD_ARCH_DIR):
 $(BUILD_ARCH_DIR)/linker.ld: $(LINKER_SCRIPT) | $(BUILD_ARCH_DIR)
 	cp $< $@
 
-# 编译引导加载程序
-$(BOOTLOADER): $(BOOTLOADER_SRC) | $(BUILD_ARCH_DIR)
-	$(AS) -f bin -o $@ $<
+# x86_64使用GRUB引导，不需要单独的bootloader
+$(BOOTLOADER):
+	@echo "x86_64 uses GRUB, no separate bootloader needed"
 
 # 通用编译规则 - 自动处理所有C文件
 $(BUILD_ARCH_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_ARCH_DIR)
@@ -103,7 +91,7 @@ $(KERNEL): $(KERNEL_OBJS) $(BUILD_ARCH_DIR)/linker.ld
 	$(LD) $(LDFLAGS) -o $@ $(KERNEL_OBJS)
 
 # 创建ISO镜像
-$(ISO): $(BOOTLOADER) $(KERNEL) | $(BUILD_ARCH_DIR)
+$(ISO): $(KERNEL) | $(BUILD_ARCH_DIR)
 	@echo "Creating $(ARCH) ISO image..."
 	@mkdir -p $(BUILD_ARCH_DIR)/iso/boot/grub
 	@cp $(KERNEL) $(BUILD_ARCH_DIR)/iso/boot/
@@ -139,12 +127,8 @@ run: $(ISO)
 run-floppy: $(BOOTLOADER)
 	$(QEMU) -fda $(BOOTLOADER)
 
-# 构建所有架构
-build-all:
-	@echo "Building i386 version..."
-	$(MAKE) ARCH=i386 all
-	@echo "Building x86_64 version..."
-	$(MAKE) ARCH=x86_64 all
+# 构建（仅x86_64）
+build-all: all
 
 # 显示当前架构信息
 info:
@@ -157,22 +141,16 @@ info:
 
 # 显示帮助
 help:
-	@echo "Boruix OS"
-	@echo ""
-	@echo "架构选择:"
-	@echo "  make ARCH=i386 [target]   - 构建32位版本 (默认)"
-	@echo "  make ARCH=x86_64 [target] - 构建64位版本"
+	@echo "Boruix OS (x86_64 only)"
 	@echo ""
 	@echo "可用目标:"
 	@echo "  all        - 构建完整的ISO镜像"
 	@echo "  rebuild    - 强制重新构建"
-	@echo "  build-all  - 构建所有架构版本"
-	@echo "  clean      - 清理当前架构构建文件"
-	@echo "  clean-all  - 清理所有架构构建文件"
+	@echo "  clean      - 清理构建文件"
+	@echo "  clean-all  - 清理所有构建文件"
 	@echo "  distclean  - 深度清理"
 	@echo "  run        - 在QEMU中运行ISO"
-	@echo "  run-floppy - 在QEMU中运行软盘"
-	@echo "  info       - 显示当前架构信息"
+	@echo "  info       - 显示架构信息"
 	@echo "  help       - 显示此帮助"
 
 .PHONY: all rebuild clean clean-all distclean run run-floppy build-all info help

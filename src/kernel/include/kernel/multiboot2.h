@@ -8,7 +8,7 @@
 
 // Multiboot2常量
 #define MULTIBOOT2_HEADER_MAGIC    0xe85250d6
-#define MULTIBOOT2_ARCHITECTURE    0          // i386 (兼容x86_64)
+#define MULTIBOOT2_ARCHITECTURE    0          // x86 architecture
 
 // 标签类型
 #define MULTIBOOT2_TAG_END         0
