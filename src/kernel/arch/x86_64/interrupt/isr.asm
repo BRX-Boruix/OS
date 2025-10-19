@@ -113,8 +113,15 @@ isr_common_stub:
     push r14
     push r15
     
-    mov rdi, rsp        ; 第一个参数：寄存器状态指针
+    ; 对齐栈到16字节（x86_64 ABI要求）
+    mov rbp, rsp
+    and rsp, ~0xF
+    
+    mov rdi, rbp        ; 第一个参数：寄存器状态指针
     call isr_handler
+    
+    ; 恢复栈指针
+    mov rsp, rbp
     
     ; 恢复所有寄存器
     pop r15
@@ -134,7 +141,6 @@ isr_common_stub:
     pop rax
     
     add rsp, 16         ; 清理错误码和中断号
-    sti
     iretq
 
 ; IRQ通用存根
@@ -155,8 +161,15 @@ irq_common_stub:
     push r14
     push r15
     
-    mov rdi, rsp
+    ; 对齐栈到16字节（x86_64 ABI要求）
+    mov rbp, rsp
+    and rsp, ~0xF
+    
+    mov rdi, rbp
     call irq_handler
+    
+    ; 恢复栈指针
+    mov rsp, rbp
     
     pop r15
     pop r14
@@ -175,5 +188,4 @@ irq_common_stub:
     pop rax
     
     add rsp, 16
-    sti
     iretq

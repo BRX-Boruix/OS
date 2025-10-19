@@ -90,10 +90,22 @@ void kmain(void) {
     }
     print_string(" Done!\n\n");
     
-    // 暂时跳过shell，直接halt
-    print_string("System initialized successfully!\n");
-    print_string("Shell temporarily disabled for debugging.\n");
+    // 暂时不启用中断，先确认系统稳定
+    print_string("System initialized successfully.\n");
+    print_string("Interrupts remain DISABLED for stability.\n");
     print_string("System halted.\n\n");
+    
+    // 显示中断状态
+    extern uint64_t get_interrupt_count(uint8_t int_no);
+    print_string("Timer ticks: ");
+    print_dec((uint32_t)get_interrupt_count(32));
+    print_string("\n");
+    print_string("Keyboard hits: ");
+    print_dec((uint32_t)get_interrupt_count(33));
+    print_string("\n\n");
+    
+    print_string("NOTE: Shell and interrupts temporarily disabled.\n");
+    print_string("      Working on interrupt handler fixes.\n");
     
     hcf();
 }
