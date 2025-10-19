@@ -21,7 +21,7 @@ void idt_set_gate(uint8_t num, uint64_t handler) {
     idt[num].offset_low = (uint16_t)(handler & 0xFFFF);
     idt[num].offset_mid = (uint16_t)((handler >> 16) & 0xFFFF);
     idt[num].offset_high = (uint32_t)((handler >> 32) & 0xFFFFFFFF);
-    idt[num].selector = 0x08;
+    idt[num].selector = 0x28;  // 修复：使用Limine的CS值，不是0x08！
     idt[num].ist = 0;
     idt[num].type = IDT_INTERRUPT_GATE;
     idt[num].reserved = 0;

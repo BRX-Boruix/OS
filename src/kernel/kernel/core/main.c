@@ -90,22 +90,59 @@ void kmain(void) {
     }
     print_string(" Done!\n\n");
     
-    // 暂时不启用中断，先确认系统稳定
-    print_string("System initialized successfully.\n");
-    print_string("Interrupts remain DISABLED for stability.\n");
-    print_string("System halted.\n\n");
-    
-    // 显示中断状态
-    extern uint64_t get_interrupt_count(uint8_t int_no);
-    print_string("Timer ticks: ");
-    print_dec((uint32_t)get_interrupt_count(32));
-    print_string("\n");
-    print_string("Keyboard hits: ");
-    print_dec((uint32_t)get_interrupt_count(33));
+    // 调试：检查当前CS寄存器
+    print_string("Debug: Checking current CS register...\n");
+    uint16_t cs;
+    __asm__ volatile("mov %%cs, %0" : "=r"(cs));
+    print_string("CS = 0x");
+    print_hex(cs);
     print_string("\n\n");
     
-    print_string("NOTE: Shell and interrupts temporarily disabled.\n");
-    print_string("      Working on interrupt handler fixes.\n");
+    // 测试Timer中断（最简单的中断）
+    print_string("Testing Timer interrupt only...\n");
     
+    // 禁用键盘中断，只测试timer
+    extern void pic_set_mask(uint8_t irq);
+    pic_set_mask(1);  // 禁用IRQ1 (keyboard)
+    print_string("Keyboard IRQ disabled\n");
+    
+    extern uint64_t get_interrupt_count(uint8_t int_no);
+    print_string("Initial timer ticks: ");
+    print_dec((uint32_t)get_interrupt_count(32));
+    print_string("\n");
+    
+    // CS已确认为0x28，IDT已修复，现在测试Timer中断
+    print_string("CS confirmed = 0x28, IDT selector fixed!\n\n");
+    
+    print_string("Enabling Timer IRQ...\n");
+    extern void pic_clear_mask(uint8_t irq);
+    pic_clear_mask(0);  // Timer
+    
+    __asm__ volatile("sti");
+    print_string("Interrupts ENABLED!\n\n");
+    
+    print_string("Waiting 3 seconds...\n");
+    unsigned char sec_start = read_cmos(0x00);
+    for (int i = 0; i < 3; i++) {
+        unsigned char sec_cur;
+        do {
+            sec_cur = read_cmos(0x00);
+            __asm__ volatile("pause");
+        } while (sec_cur == sec_start);
+        sec_start = sec_cur;
+        print_char('.');
+    }
+    
+    print_string("\n\nTimer ticks: ");
+    print_dec((uint32_t)get_interrupt_count(32));
+    print_string("\n");
+    
+    if (get_interrupt_count(32) > 0) {
+        print_string("\nSUCCESS! Timer interrupt is WORKING!\n\n");
+    } else {
+        print_string("\nFAILED: Timer still not working\n\n");
+    }
+    
+    print_string("System halted.\n");
     hcf();
 }
