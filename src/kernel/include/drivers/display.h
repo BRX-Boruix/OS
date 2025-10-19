@@ -17,6 +17,12 @@ void print_char(char c);
 void print_string(const char* str);
 void delay(int count);
 
+// 屏幕滚动相关函数
+void scroll_screen_up(void);
+uint32_t get_screen_width_chars(void);
+uint32_t get_screen_height_chars(void);
+uint32_t get_scroll_offset(void);
+
 // 辅助打印函数
 void print_hex(uint64_t value);
 void print_dec(uint32_t value);
