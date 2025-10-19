@@ -1,6 +1,7 @@
 // Boruix OS x86_64中断处理程序
 
 #include "kernel/types.h"
+#include "kernel/interrupt.h"
 #include "drivers/display.h"
 #include "drivers/timer.h"
 #include "drivers/keyboard.h"
@@ -81,6 +82,16 @@ void irq_handler(registers_t* regs) {
     
     uint8_t irq = int_no - 32;
     
+    // 检查优先级，决定是否执行
+    if (!irq_should_execute(irq)) {
+        // 中断被阻塞，发送EOI后直接返回
+        pic_send_eoi(irq);
+        return;
+    }
+    
+    // 进入中断处理
+    irq_enter(irq);
+    
     switch (irq) {
         case 0:  // IRQ0 - Timer
             timer_irq_handler();
@@ -93,6 +104,9 @@ void irq_handler(registers_t* regs) {
         default:
             break;
     }
+    
+    // 退出中断处理
+    irq_exit();
     
     pic_send_eoi(irq);
 }

@@ -18,6 +18,10 @@ void interrupt_init(void) {
     pic_init();
     print_string("[PIC] Programmable Interrupt Controller initialized\n");
     
+    // 初始化中断优先级系统
+    irq_priority_init();
+    print_string("[IRQ] Interrupt priority system initialized\n");
+    
     timer_init(TIMER_FREQ_HZ);
     print_string("[TIMER] System timer initialized (");
     print_dec(TIMER_FREQ_HZ);
