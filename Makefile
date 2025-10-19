@@ -37,7 +37,11 @@ LIMINE_DIR = limine
 KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/kernel/shell/**/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/kernel/shell/**/**/*.c) \
-                     $(wildcard $(SRC_DIR)/kernel/drivers/*/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/drivers/cmos/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/drivers/display/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/drivers/keyboard/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/drivers/timer/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/drivers/framebuffer/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/memory/memory_common.c)
 
 # 架构特定的C源文件（明确指定子目录避免通配符问题）

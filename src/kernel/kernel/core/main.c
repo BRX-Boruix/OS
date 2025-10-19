@@ -1,72 +1,99 @@
-// Boruix OS 主内核 - Limine启动（VGA文本模式）
+// Boruix OS 主内核 - Limine + Framebuffer
 
 #include "kernel/kernel.h"
 #include "drivers/display.h"
 #include "drivers/cmos.h"
-#include "kernel/shell.h"
 #include "kernel/interrupt.h"
 #include "kernel/limine.h"
 
-// Limine base revision
+// Limine requests
 __attribute__((used, section(".requests")))
 static volatile LIMINE_BASE_REVISION(2);
 
-// Start和End markers
+__attribute__((used, section(".requests")))
+static volatile struct limine_framebuffer_request framebuffer_request = {
+    .id = LIMINE_FRAMEBUFFER_REQUEST,
+    .revision = 0
+};
+
 __attribute__((used, section(".requests_start_marker")))
 static volatile LIMINE_REQUESTS_START_MARKER;
 
 __attribute__((used, section(".requests_end_marker")))
 static volatile LIMINE_REQUESTS_END_MARKER;
 
-// Halt and catch fire
 static void hcf(void) {
-    for (;;) {
-        __asm__("hlt");
-    }
+    for (;;) __asm__("hlt");
 }
 
-// 内核入口点
 void kmain(void) {
-    // 检查Limine base revision
-    if (LIMINE_BASE_REVISION_SUPPORTED == false) {
-        hcf();
-    }
+    // 检查Limine
+    if (LIMINE_BASE_REVISION_SUPPORTED == false) hcf();
+    if (framebuffer_request.response == NULL || 
+        framebuffer_request.response->framebuffer_count < 1) hcf();
     
-    // 初始化显示
+    // 初始化显示系统（framebuffer适配层）
+    display_init(framebuffer_request.response->framebuffers[0]);
     clear_screen();
     
     // 显示欢迎信息
-    print_string("BORUIX OS x86_64 - Limine Bootloader\n");
-    print_string("========================================\n\n");
+    print_string("BORUIX OS x86_64\n");
+    print_string("========================================\n");
+    print_string("Limine Bootloader OK\n\n");
+    
+    // 显示分辨率
+    struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
+    print_string("Resolution: ");
+    print_dec(fb->width);
+    print_char('x');
+    print_dec(fb->height);
+    print_string("\n\n");
     
     // 显示时间
     print_string("Current time: ");
-    print_current_time();
+    unsigned char hour, minute, second;
+    get_current_time(&hour, &minute, &second);
+    print_two_digits(hour);
+    print_char(':');
+    print_two_digits(minute);
+    print_char(':');
+    print_two_digits(second);
     print_string("\n\n");
     
-    // 初始化中断
+    // 初始化中断系统
+    print_string("Initializing interrupt system...\n");
     interrupt_init();
-    print_string("\n");
+    print_string("Interrupt system ready!\n\n");
     
-    print_string("Kernel loaded successfully!\n");
-    print_string("Ready\n\n");
+    print_string("========================================\n");
+    print_string("SYSTEM READY\n");
+    print_string("========================================\n\n");
     
-    // 等待3秒
+    // Loading动画
+    print_string("Loading");
     for (int i = 0; i < 3; i++) {
-        print_string("Loading");
         for (int j = 0; j <= i; j++) {
             print_char('.');
         }
-        print_string("\r");
-        uint8_t sec_origin = read_cmos(0x00);
-        uint8_t sec_cur;
+        
+        // 延迟1秒
+        unsigned char sec_start = read_cmos(0x00);
+        unsigned char sec_current;
         do {
-            sec_cur = read_cmos(0x00);
-        } while (sec_cur == sec_origin);
+            sec_current = read_cmos(0x00);
+        } while (sec_current == sec_start);
+        
+        if (i < 2) {
+            print_char('\r');
+            print_string("Loading");
+        }
     }
-    print_string("Done       \n");
-    clear_screen();
+    print_string(" Done!\n\n");
     
-    // 启动shell
-    shell_main();
+    // 暂时跳过shell，直接halt
+    print_string("System initialized successfully!\n");
+    print_string("Shell temporarily disabled for debugging.\n");
+    print_string("System halted.\n\n");
+    
+    hcf();
 }
