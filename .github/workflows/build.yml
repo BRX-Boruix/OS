@@ -27,10 +27,15 @@ jobs:
           nasm \
           gcc \
           binutils \
-          grub-common \
-          grub-pc-bin \
           xorriso \
-          mtools
+          mtools \
+          git
+    
+    # 安装Limine
+    - name: Install Limine
+      run: |
+        echo "Installing Limine bootloader..."
+        make install-limine
     
     # 构建x86_64架构
     - name: Build x86_64
