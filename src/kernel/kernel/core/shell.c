@@ -171,6 +171,9 @@ void shell_main(void) {
         // 使用中断处理
         __asm__ volatile("hlt");
         
+        // 确保中断处理完成后继续执行
+        __asm__ volatile("" ::: "memory");
+        
         // 优先处理组合键事件（避免与普通字符冲突）
         int combo_processed = 0;
         if (keyboard_has_combo_event()) {

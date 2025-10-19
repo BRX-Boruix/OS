@@ -89,11 +89,21 @@ static uint32_t cursor_y = 0;
 static uint32_t fg_color = 0xFFFFFF;
 static uint32_t bg_color = 0x000000;
 
+// 屏幕滚动相关变量
+static uint32_t screen_width_chars = 0;  // 屏幕宽度（字符数）
+static uint32_t screen_height_chars = 0; // 屏幕高度（字符数）
+static uint32_t scroll_offset = 0;       // 当前滚动偏移量
+
 // 初始化显示系统（由内核调用）
 void display_init(struct limine_framebuffer *framebuffer) {
     fb = framebuffer;
     cursor_x = 0;
     cursor_y = 0;
+    scroll_offset = 0;
+    
+    // 计算屏幕尺寸（字符数）
+    screen_width_chars = fb->width / 8;
+    screen_height_chars = fb->height / 8;
 }
 
 static void putpixel(uint32_t x, uint32_t y, uint32_t color) {
@@ -109,7 +119,9 @@ void clear_screen(void) {
     }
     cursor_x = 0;
     cursor_y = 0;
+    scroll_offset = 0;
 }
+
 
 void print_char(char c) {
     if (!fb) return;
@@ -118,7 +130,9 @@ void print_char(char c) {
         cursor_x = 0;
         cursor_y += 8;
         if (cursor_y + 8 > fb->height) {
-            cursor_y = 0; // 简单回卷
+            // 当光标超出屏幕时，向上滚动而不是重置
+            scroll_screen_up();
+            cursor_y = fb->height - 8; // 将光标放在最后一行
         }
         return;
     }
@@ -160,7 +174,9 @@ void print_char(char c) {
         cursor_x = 0;
         cursor_y += 8;
         if (cursor_y + 8 > fb->height) {
-            cursor_y = 0;
+            // 当光标超出屏幕时，向上滚动而不是重置
+            scroll_screen_up();
+            cursor_y = fb->height - 8; // 将光标放在最后一行
         }
     }
 }
@@ -215,4 +231,64 @@ void set_color(uint8_t fg, uint8_t bg) {
     
     if (fg < 16) fg_color = colors[fg];
     if (bg < 16) bg_color = colors[bg];
+}
+
+// 屏幕滚动相关函数实现
+void scroll_screen_up(void) {
+    if (!fb) return;
+    
+    // 将整个屏幕内容向上移动一行（8像素）
+    uint32_t line_size = fb->pitch * 8; // 一行的大小（字节）
+    
+    // 从第二行开始，将内容向上复制
+    uint8_t *src = (uint8_t *)fb->address + line_size;
+    uint8_t *dst = (uint8_t *)fb->address;
+    
+    // 使用更安全的内存移动方式
+    // 逐行复制，避免内存重叠问题
+    for (uint32_t line = 0; line < (fb->height - 8); line += 8) {
+        uint8_t *src_line = src + line * fb->pitch;
+        uint8_t *dst_line = dst + line * fb->pitch;
+        for (uint32_t i = 0; i < line_size; i++) {
+            dst_line[i] = src_line[i];
+        }
+    }
+    
+    // 清除最后一行
+    uint8_t *last_line = (uint8_t *)fb->address + (fb->height - 8) * fb->pitch;
+    for (uint32_t y = 0; y < 8; y++) {
+        for (uint32_t x = 0; x < fb->width; x++) {
+            uint32_t *pixel = (uint32_t *)(last_line + y * fb->pitch + x * 4);
+            *pixel = bg_color;
+        }
+    }
+    
+    // 更新滚动偏移量
+    scroll_offset++;
+}
+
+// 获取屏幕尺寸信息
+uint32_t get_screen_width_chars(void) {
+    return screen_width_chars;
+}
+
+uint32_t get_screen_height_chars(void) {
+    return screen_height_chars;
+}
+
+uint32_t get_scroll_offset(void) {
+    return scroll_offset;
+}
+
+// 设置光标位置
+void set_cursor(int x, int y) {
+    if (!fb) return;
+    
+    // 将字符坐标转换为像素坐标
+    cursor_x = x * 8;
+    cursor_y = y * 8;
+    
+    // 确保光标位置在有效范围内
+    if (cursor_x >= fb->width) cursor_x = fb->width - 8;
+    if (cursor_y >= fb->height) cursor_y = fb->height - 8;
 }
