@@ -2,6 +2,7 @@
 // 验证yang borui参数并打印英文难崩话语
 
 #include "great.h"
+#include "kernel/shell.h"
 #include "drivers/display.h"
 #include "drivers/cmos.h"
 #include "../../utils/string.h"
@@ -49,25 +50,36 @@ static unsigned int simple_rand(unsigned int* seed) {
 }
 
 void cmd_great(int argc, char* argv[]) {
-    if (shell_strcasecmp(argv[1], "help") == 0) {
+    // 使用安全的参数检查
+    if (!ARGC_CHECK(argc, 2)) {
+        // 神秘提示，若参数不足，则给出谜题式英文提示
+        print_string("To unlock the words of wisdom, provide the name in two pieces: surname and given name.\n");
+        return;
+    }
+    
+    // 使用安全的参数访问
+    const char* first_arg = SAFE_ARGV_STR(argc, argv, 1, "");
+    if (shell_strcasecmp(first_arg, "help") == 0) {
         print_string("Try yang borui \n");
         return;
     }
 
+    if (!ARGC_CHECK(argc, 3)) {
+        // 神秘提示，若参数不足，则给出谜题式英文提示
+        print_string("To unlock the words of wisdom, provide the name in two pieces: surname and given name.\n");
+        return;
+    }
+
     // 验证第一个参数是否为 "yang"（大小写不敏感）
-    if (shell_strcasecmp(argv[1], "yang") != 0) {
+    if (shell_strcasecmp(first_arg, "yang") != 0) {
         print_string("What's his surname? \n");
         return;
     }
     
     // 验证第二个参数是否为 "borui"（大小写不敏感）
-    if (shell_strcasecmp(argv[2], "borui") != 0) {
+    const char* second_arg = SAFE_ARGV_STR(argc, argv, 2, "");
+    if (shell_strcasecmp(second_arg, "borui") != 0) {
         print_string(" What's his given name?\n");
-        return;
-    }
-    // 检查参数数量
-    if (argc < 3) {
-        print_string("Who is it?\n");
         return;
     }
     
