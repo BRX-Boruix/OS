@@ -128,6 +128,20 @@ void print_char(char c) {
         return;
     }
     
+    if (c == '\b') {
+        // 退格键：向左移动光标并清除字符
+        if (cursor_x >= 8) {
+            cursor_x -= 8;
+            // 清除当前位置的字符（用背景色填充）
+            for (int row = 0; row < 8; row++) {
+                for (int col = 0; col < 8; col++) {
+                    putpixel(cursor_x + col, cursor_y + row, bg_color);
+                }
+            }
+        }
+        return;
+    }
+    
     // 绘制字符
     uint8_t idx = (uint8_t)c;
     if (idx >= 128) idx = '?';
