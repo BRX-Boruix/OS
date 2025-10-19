@@ -7,12 +7,8 @@
 
 #ifdef __x86_64__
 
-// 全局页表指针 - 使用引导代码设置的页表
-extern uint64_t pml4_table[];
-extern uint64_t pdp_table[];
-extern uint64_t pd_table[];
-
-// 内部页表指针
+// Limine管理页表，我们不需要直接访问页表结构
+// 内部页表指针（Limine环境下暂不使用）
 static uint64_t* kernel_pml4 = NULL;
 static uint64_t* kernel_pdp = NULL;
 static uint64_t* kernel_pd = NULL;
@@ -33,20 +29,18 @@ static heap_block_t* heap_start = NULL;
 static uint64_t heap_current = KERNEL_HEAP_START;
 
 // 初始化x86_64内存管理
-void memory_init_x86_64(uint64_t multiboot_info) {
-    print_string("Initializing x86_64 memory management...\n");
+void memory_init_x86_64(uint64_t info) {
+    (void)info; // 避免未使用参数警告
     
-    // 使用引导代码已设置的页表
-    kernel_pml4 = pml4_table;
-    kernel_pdp = pdp_table;
-    kernel_pd = pd_table;
+    print_string("Initializing x86_64 memory management (Limine)...\n");
     
-    // 简单的内存检测（这里使用固定值，实际应解析multiboot信息）
+    // Limine已经设置好页表，我们只需要初始化内存分配器
+    // 简单的内存检测（这里使用固定值，后续可以使用Limine内存映射）
     total_memory = 128 * 1024 * 1024;  // 假设128MB内存
     next_free_page = 0x400000;  // 4MB开始分配
     
     print_string("- Total memory: 128MB\n");
-    print_string("- Using existing page tables\n");
+    print_string("- Using Limine page tables\n");
     print_string("- Page allocator initialized\n");
     
     // 初始化内核堆 - 使用更安全的地址

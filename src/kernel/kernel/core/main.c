@@ -1,73 +1,72 @@
-// Boruix OS 主内核文件
-// 内核入口点和主要逻辑
+// Boruix OS 主内核 - Limine启动（VGA文本模式）
 
 #include "kernel/kernel.h"
 #include "drivers/display.h"
 #include "drivers/cmos.h"
-#include "drivers/timer.h"
-#include "kernel/memory.h"
 #include "kernel/shell.h"
 #include "kernel/interrupt.h"
+#include "kernel/limine.h"
 
-// print_hex和print_dec现在在display.c中实现
+// Limine base revision
+__attribute__((used, section(".requests")))
+static volatile LIMINE_BASE_REVISION(2);
 
-// 显示启动信息
-static void show_boot_info(uint32_t magic, uintptr_t multiboot_info) {
-    // 显示欢迎信息
-    print_string("BORUIX KERNEL x86_64\n");
-    print_string("========================================\n\n");
-    
-    // 显示multiboot信息
-    print_string("Boot Information:\n");
-    print_string("- Magic: 0x");
-    print_hex(magic);
-    
-    if (magic == 0x2BADB002) {
-        print_string(" (Valid)\n");
-        print_string("- Multiboot Info: ");
-        print_hex((uint32_t)multiboot_info);
-        print_string("\n");
-    } else {
-        print_string(" (Invalid - Expected 0x2BADB002)\n");
+// Start和End markers
+__attribute__((used, section(".requests_start_marker")))
+static volatile LIMINE_REQUESTS_START_MARKER;
+
+__attribute__((used, section(".requests_end_marker")))
+static volatile LIMINE_REQUESTS_END_MARKER;
+
+// Halt and catch fire
+static void hcf(void) {
+    for (;;) {
+        __asm__("hlt");
     }
-    print_string("\n");
 }
 
-// 内核主函数 - x86_64架构
-void kernel_main(uint32_t magic, uint64_t multiboot_info) {
+// 内核入口点
+void kmain(void) {
+    // 检查Limine base revision
+    if (LIMINE_BASE_REVISION_SUPPORTED == false) {
+        hcf();
+    }
+    
     // 初始化显示
     clear_screen();
     
-    // 显示启动信息
-    show_boot_info(magic, multiboot_info);
+    // 显示欢迎信息
+    print_string("BORUIX OS x86_64 - Limine Bootloader\n");
+    print_string("========================================\n\n");
     
-    // 显示当前时间
+    // 显示时间
     print_string("Current time: ");
     print_current_time();
     print_string("\n\n");
     
-    // 初始化中断系统
+    // 初始化中断
     interrupt_init();
     print_string("\n");
     
-    print_string("Ready\n");
-
-    // 等待3秒，每秒输出动画（使用实际CMOS时间，禁止写死）
+    print_string("Kernel loaded successfully!\n");
+    print_string("Ready\n\n");
+    
+    // 等待3秒
     for (int i = 0; i < 3; i++) {
         print_string("Loading");
         for (int j = 0; j <= i; j++) {
             print_char('.');
         }
-        print_string("\r");  // 回到行首，覆盖动画
+        print_string("\r");
         uint8_t sec_origin = read_cmos(0x00);
         uint8_t sec_cur;
         do {
             sec_cur = read_cmos(0x00);
         } while (sec_cur == sec_origin);
     }
-    print_string("Done\n");
+    print_string("Done       \n");
     clear_screen();
-
+    
     // 启动shell
     shell_main();
 }

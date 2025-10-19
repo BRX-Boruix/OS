@@ -7,7 +7,7 @@
 #include "kernel/types.h"
 #include "arch/x86_64.h"
 
-// 内核主函数（x86_64）
-void kernel_main(uint32_t magic, uint64_t multiboot_info);
+// 内核主函数 - Limine入口点（CoolPotOS风格）
+void kmain(void);
 
 #endif // BORUIX_KERNEL_H
