@@ -42,6 +42,7 @@ KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/keyboard/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/timer/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/framebuffer/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/lib/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/memory/memory_common.c)
 
 # 架构特定的C源文件（明确指定子目录避免通配符问题）

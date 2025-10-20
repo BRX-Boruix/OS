@@ -2,9 +2,7 @@
 
 #include "kernel/types.h"
 #include "kernel/limine.h"
-
-// 完整的8x8字体
-#include "fb_font_8x8.h"
+#include "font.h"
 
 static struct limine_framebuffer *fb = NULL;
 static uint32_t cursor_x = 0, cursor_y = 0;
@@ -48,9 +46,7 @@ void fb_putchar(char c) {
     }
     
     // 绘制字符
-    uint8_t idx = (uint8_t)c;
-    if (idx >= 128) idx = '?';
-    const uint8_t *glyph = font_8x8_basic[idx];
+    const uint8_t *glyph = font_get_glyph((uint8_t)c);
     
     for (int row = 0; row < 8; row++) {
         for (int col = 0; col < 8; col++) {
