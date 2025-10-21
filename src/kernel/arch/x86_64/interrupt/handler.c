@@ -55,7 +55,8 @@ void isr_handler(registers_t* regs) {
     if (int_no < 32) {
         // 禁用中断，防止重入
         __asm__ volatile("cli");
-        
+        print_string("\n========================================\n");
+        print_string("\nSYSTEAM IS DIED. \n");
         print_string("\n========================================\n");
         print_string("[EXCEPTION] ");
         print_string(exception_messages[int_no]);
