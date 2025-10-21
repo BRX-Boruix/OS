@@ -18,5 +18,6 @@
 #include "irqprio/irqprio.h"
 #include "irqtest/irqtest.h"
 #include "great/great.h"
+#include "crash/crash.h"
 
 #endif // BUILTIN_H

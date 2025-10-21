@@ -21,6 +21,7 @@ static shell_command_t commands[] = {
     {"irqtest", "Test IRQ priority system", cmd_irqtest},
     {"reboot", "Reboot system", cmd_reboot},
     {"great", "Let the great Yang Borui give you the answer.", cmd_great},
+    {"crash", "Manually trigger system crash", cmd_crash},
     //{"test", "Test command", cmd_test},
     {NULL, NULL, NULL}  // 结束标记
 };
