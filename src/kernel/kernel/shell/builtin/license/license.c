@@ -31,6 +31,13 @@ static const third_party_project_t third_party_projects[] = {
         .description = "Fast terminal emulator with framebuffer backend",
         .url = "https://codeberg.org/Mintsuki/Flanterm.git"
     },
+    {
+        .name = "freestnd-c-hdrs-0bsd",
+        .version = "2022-2024",
+        .license = "0BSD License",
+        .description = "Collection of 0BSD-licensed freestanding C headers for GCC and Clang",
+        .url = "https://codeberg.org/OSDev/freestnd-c-hdrs-0bsd.git"
+    },
     {NULL, NULL, NULL, NULL, NULL}  // 结束标记
 };
 
@@ -136,6 +143,23 @@ static void show_flanterm_license(void) {
     print_string("OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n");
 }
 
+// 显示freestnd-c-hdrs-0bsd许可证信息
+static void show_freestnd_license(void) {
+    print_string("FREESTND-C-HDRS-0BSD LICENSE\n");
+    print_string("============================\n\n");
+    
+    print_string("Copyright (C) 2022-2024 mintsuki and contributors.\n\n");
+    print_string("Permission to use, copy, modify, and/or distribute this software for any\n");
+    print_string("purpose with or without fee is hereby granted.\n\n");
+    print_string("THE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\n");
+    print_string("REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND\n");
+    print_string("FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\n");
+    print_string("INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM\n");
+    print_string("LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR\n");
+    print_string("OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR\n");
+    print_string("PERFORMANCE OF THIS SOFTWARE.\n\n");
+}
+
 
 // 显示帮助信息
 static void show_help(void) {
@@ -148,19 +172,19 @@ static void show_help(void) {
     print_string("  project      - Show Boruix OS license\n");
     print_string("  limine       - Show Limine bootloader license\n");
     print_string("  flanterm     - Show Flanterm terminal license\n");
+    print_string("  freestnd     - Show freestnd-c-hdrs-0bsd license\n");
     print_string("  help         - Show this help message\n\n");
 }
 
 void cmd_license(int argc, char* argv[]) {
-    // 如果没有参数，显示所有信息
+    // 如果没有参数，显示boruix os所有许可证信息，并提示help
     if (argc == 1) {
         show_third_party_projects();
         print_string("========================================\n\n");
         show_project_license();
         print_string("========================================\n\n");
-        show_limine_license();
-        print_string("========================================\n\n");
-        show_flanterm_license();
+        print_string("Type 'license help' for usage information.\n");
+        print_string("and 'license projects' to show third-party projects list.\n");
         return;
     }
     
@@ -175,6 +199,8 @@ void cmd_license(int argc, char* argv[]) {
         show_limine_license();
     } else if (shell_strcmp(option, "flanterm") == 0) {
         show_flanterm_license();
+    } else if (shell_strcmp(option, "freestnd") == 0) {
+        show_freestnd_license();
     } else if (shell_strcmp(option, "help") == 0) {
         show_help();
     } else {
