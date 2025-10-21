@@ -202,11 +202,35 @@ void shell_main(void) {
         if (!combo_processed && keyboard_has_char()) {
             char c = keyboard_get_char();
             
-            if (c == '\n' || c == '\r') {
+            // 处理特殊键（翻页键等）
+            if (c == 0x01) {  // Ctrl+A (Page Down)
+                terminal_history_page_down();
+                keyboard_reset_combo_state();
+            } else if (c == 0x02) {  // Ctrl+B (Page Up)
+                terminal_history_page_up();
+                keyboard_reset_combo_state();
+            } else if (c == 0x05) {  // Ctrl+E (Up Arrow)
+                terminal_history_scroll_up();
+                keyboard_reset_combo_state();
+            } else if (c == 0x06) {  // Ctrl+F (Down Arrow)
+                terminal_history_scroll_down();
+                keyboard_reset_combo_state();
+            } else if (c == '\n' || c == '\r') {
                 // 回车键 - 处理命令
                 print_char('\n');
                 input_buffer[buffer_pos] = '\0';
+                
+                // 将输入行添加到历史缓冲区
+                terminal_history_add_line(input_buffer);
+                
+                // 启用输出捕获
+                terminal_enable_output_capture();
+                
                 shell_process_command(input_buffer);
+                
+                // 完成输出捕获
+                terminal_finish_output_capture();
+                
                 buffer_pos = 0;
                 cursor_pos = 0;
                 keyboard_reset_combo_state();
@@ -331,6 +355,89 @@ void shell_init(void) {
     
     // 初始化键盘驱动
     keyboard_init();
+    
+    // 初始化终端历史缓冲区
+    terminal_history_init();
+    
+    // 添加大量测试数据到历史缓冲区（超过屏幕高度）
+    for (int i = 1; i <= 60; i++) {
+        char test_line[128];
+        // 创建测试行
+        int j = 0;
+        test_line[j++] = 'T';
+        test_line[j++] = 'e';
+        test_line[j++] = 's';
+        test_line[j++] = 't';
+        test_line[j++] = ' ';
+        test_line[j++] = 'l';
+        test_line[j++] = 'i';
+        test_line[j++] = 'n';
+        test_line[j++] = 'e';
+        test_line[j++] = ' ';
+        
+        // 添加行号
+        if (i >= 100) {
+            test_line[j++] = '0' + (i / 100);
+            test_line[j++] = '0' + ((i / 10) % 10);
+            test_line[j++] = '0' + (i % 10);
+        } else if (i >= 10) {
+            test_line[j++] = '0' + (i / 10);
+            test_line[j++] = '0' + (i % 10);
+        } else {
+            test_line[j++] = '0' + i;
+        }
+        
+        test_line[j++] = ':';
+        test_line[j++] = ' ';
+        test_line[j++] = 'T';
+        test_line[j++] = 'h';
+        test_line[j++] = 'i';
+        test_line[j++] = 's';
+        test_line[j++] = ' ';
+        test_line[j++] = 'i';
+        test_line[j++] = 's';
+        test_line[j++] = ' ';
+        test_line[j++] = 't';
+        test_line[j++] = 'e';
+        test_line[j++] = 's';
+        test_line[j++] = 't';
+        test_line[j++] = ' ';
+        test_line[j++] = 'd';
+        test_line[j++] = 'a';
+        test_line[j++] = 't';
+        test_line[j++] = 'a';
+        test_line[j++] = ' ';
+        test_line[j++] = 'f';
+        test_line[j++] = 'o';
+        test_line[j++] = 'r';
+        test_line[j++] = ' ';
+        test_line[j++] = 's';
+        test_line[j++] = 'c';
+        test_line[j++] = 'r';
+        test_line[j++] = 'o';
+        test_line[j++] = 'l';
+        test_line[j++] = 'l';
+        test_line[j++] = 'i';
+        test_line[j++] = 'n';
+        test_line[j++] = 'g';
+        test_line[j++] = ' ';
+        test_line[j++] = 'f';
+        test_line[j++] = 'u';
+        test_line[j++] = 'n';
+        test_line[j++] = 'c';
+        test_line[j++] = 't';
+        test_line[j++] = 'i';
+        test_line[j++] = 'o';
+        test_line[j++] = 'n';
+        test_line[j++] = 'a';
+        test_line[j++] = 'l';
+        test_line[j++] = 'i';
+        test_line[j++] = 't';
+        test_line[j++] = 'y';
+        test_line[j] = '\0';
+        
+        terminal_history_add_line(test_line);
+    }
     
     // Shell初始化完成
     print_string("[SHELL] Shell initialized\n");

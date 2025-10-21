@@ -33,4 +33,22 @@ void set_color(uint8_t fg, uint8_t bg);
 // 手动刷新显示
 void display_flush(void);
 
+// 终端历史缓冲区管理函数
+void terminal_history_init(void);
+void terminal_history_add_line(const char* line);
+void terminal_history_page_up(void);
+void terminal_history_page_down(void);
+void terminal_history_scroll_up(void);
+void terminal_history_scroll_down(void);
+void terminal_history_redraw(void);
+int terminal_history_get_scroll_offset(void);
+int terminal_history_get_max_scroll_offset(void);
+int terminal_history_is_in_history(void);
+
+// 输出捕获系统
+void terminal_enable_output_capture(void);
+void terminal_disable_output_capture(void);
+void terminal_capture_output(const char* str);
+void terminal_finish_output_capture(void);
+
 #endif // BORUIX_DISPLAY_H

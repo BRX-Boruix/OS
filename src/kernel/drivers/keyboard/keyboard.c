@@ -11,6 +11,9 @@ static keyboard_state_t keyboard_state;
 // 全局时间戳计数器（简单实现）
 static uint32_t global_timestamp = 0;
 
+// 扩展扫描码状态
+static int extended_scancode = 0;
+
 // 函数声明
 static uint32_t get_timestamp(void);
 static void increment_timestamp(void);
@@ -207,8 +210,36 @@ static void add_combo_event(combo_event_type_t type, uint8_t scancode, uint8_t a
 
 // 处理键盘事件
 static void process_key_event(uint8_t scancode) {
+    // 检查是否是扩展扫描码前缀
+    if (scancode == 0xE0) {
+        extended_scancode = 1;
+        return;
+    }
+    
     uint8_t is_key_up = (scancode & 0x80) != 0;
     uint8_t key_code = scancode & 0x7F;
+    
+    // 如果是扩展扫描码，调整键码
+    if (extended_scancode) {
+        // 扩展扫描码的Page Up/Page Down等键
+        if (key_code == 0x49) key_code = KEY_PAGE_UP;      // Page Up
+        else if (key_code == 0x51) key_code = KEY_PAGE_DOWN; // Page Down
+        else if (key_code == 0x48) key_code = KEY_UP_ARROW;  // Up Arrow
+        else if (key_code == 0x50) key_code = KEY_DOWN_ARROW; // Down Arrow
+        else if (key_code == 0x4B) key_code = KEY_LEFT_ARROW; // Left Arrow
+        else if (key_code == 0x4D) key_code = KEY_RIGHT_ARROW; // Right Arrow
+        else if (key_code == 0x47) key_code = KEY_HOME;      // Home
+        else if (key_code == 0x4F) key_code = KEY_END;       // End
+        else if (key_code == 0x52) key_code = KEY_INSERT;     // Insert
+        else if (key_code == 0x53) key_code = KEY_DELETE;     // Delete
+        else {
+            // 不是特殊键，忽略这个扫描码
+            extended_scancode = 0;
+            return;
+        }
+        
+        extended_scancode = 0; // 重置扩展扫描码状态
+    }
     
     if (is_key_up) {
         // 键释放事件
@@ -265,14 +296,46 @@ static void process_key_event(uint8_t scancode) {
                 keyboard_state.caps_lock = !keyboard_state.caps_lock;
                 break;
             default:
-                // 处理普通字符
-                unsigned char ascii = keyboard_scancode_to_ascii(scancode);
-                if (ascii != 0) {
-                    // 添加到普通字符缓冲区
-                    if (keyboard_state.count < KEYBOARD_BUFFER_SIZE) {
-                        keyboard_state.buffer[keyboard_state.tail] = ascii;
-                        keyboard_state.tail = (keyboard_state.tail + 1) % KEYBOARD_BUFFER_SIZE;
-                        keyboard_state.count++;
+                // 处理特殊键（方向键、翻页键等）
+                if (key_code == KEY_PAGE_UP || key_code == KEY_PAGE_DOWN || 
+                    key_code == KEY_UP_ARROW || key_code == KEY_DOWN_ARROW ||
+                    key_code == KEY_LEFT_ARROW || key_code == KEY_RIGHT_ARROW ||
+                    key_code == KEY_HOME || key_code == KEY_END ||
+                    key_code == KEY_INSERT || key_code == KEY_DELETE) {
+                    // 特殊键不产生ASCII字符，但需要特殊处理
+                    // 这里我们使用特殊的ASCII码来表示这些键
+                    unsigned char special_ascii = 0;
+                    switch (key_code) {
+                        case KEY_PAGE_UP: special_ascii = 0x02; break;      // Ctrl+B
+                        case KEY_PAGE_DOWN: special_ascii = 0x01; break;    // Ctrl+A
+                        case KEY_UP_ARROW: special_ascii = 0x05; break;      // Ctrl+E
+                        case KEY_DOWN_ARROW: special_ascii = 0x06; break;   // Ctrl+F
+                        case KEY_LEFT_ARROW: special_ascii = 0x03; break;    // Ctrl+C
+                        case KEY_RIGHT_ARROW: special_ascii = 0x04; break;   // Ctrl+D
+                        case KEY_HOME: special_ascii = 0x07; break;         // Ctrl+G
+                        case KEY_END: special_ascii = 0x08; break;          // Ctrl+H
+                        case KEY_INSERT: special_ascii = 0x09; break;        // Ctrl+I
+                        case KEY_DELETE: special_ascii = 0x0A; break;         // Ctrl+J
+                    }
+                    
+                    if (special_ascii != 0) {
+                        // 添加到普通字符缓冲区
+                        if (keyboard_state.count < KEYBOARD_BUFFER_SIZE) {
+                            keyboard_state.buffer[keyboard_state.tail] = special_ascii;
+                            keyboard_state.tail = (keyboard_state.tail + 1) % KEYBOARD_BUFFER_SIZE;
+                            keyboard_state.count++;
+                        }
+                    }
+                } else {
+                    // 处理普通字符
+                    unsigned char ascii = keyboard_scancode_to_ascii(scancode);
+                    if (ascii != 0) {
+                        // 添加到普通字符缓冲区
+                        if (keyboard_state.count < KEYBOARD_BUFFER_SIZE) {
+                            keyboard_state.buffer[keyboard_state.tail] = ascii;
+                            keyboard_state.tail = (keyboard_state.tail + 1) % KEYBOARD_BUFFER_SIZE;
+                            keyboard_state.count++;
+                        }
                     }
                 }
                 
