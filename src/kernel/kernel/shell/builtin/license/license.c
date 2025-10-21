@@ -65,7 +65,8 @@ static void show_third_party_projects(void) {
         
         print_string("URL: ");
         print_string(third_party_projects[i].url);
-        print_string("\n\n");
+        print_string("\n");
+        print_string("----------------------------------------\n");
     }
 }
 
@@ -179,7 +180,6 @@ static void show_help(void) {
 void cmd_license(int argc, char* argv[]) {
     // 如果没有参数，显示boruix os所有许可证信息，并提示help
     if (argc == 1) {
-        show_third_party_projects();
         print_string("========================================\n\n");
         show_project_license();
         print_string("========================================\n\n");
