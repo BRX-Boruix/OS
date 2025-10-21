@@ -22,6 +22,7 @@ static void process_key_event(uint8_t scancode);
 static void reset_combo_sequence(void);
 static int is_modifier_key(uint8_t scancode);
 static uint8_t get_modifier_state(void);
+static void keyboard_hardware_init(void);
 
 // 扫描码到ASCII码的映射表（无Shift）
 static const unsigned char scancode_to_ascii[128] = {
@@ -54,8 +55,16 @@ static unsigned char inb(unsigned short port) {
     return result;
 }
 
+// 简单的端口输出函数
+static void outb(unsigned short port, unsigned char value) {
+    __asm__ volatile ("outb %0, %1" : : "a" (value), "Nd" (port));
+}
+
 // 初始化键盘
 void keyboard_init(void) {
+    // 硬件初始化 - 重置PS/2键盘控制器
+    keyboard_hardware_init();
+    
     // 初始化键盘状态
     keyboard_state.head = 0;
     keyboard_state.tail = 0;
@@ -445,4 +454,74 @@ int keyboard_is_shift_pressed(void) {
 
 int keyboard_is_alt_pressed(void) {
     return keyboard_state.alt_pressed;
+}
+
+// PS/2键盘硬件初始化
+static void keyboard_hardware_init(void) {
+    // 等待键盘控制器就绪
+    int timeout = 10000;
+    while (timeout-- > 0) {
+        if ((inb(0x64) & 0x02) == 0) break;
+    }
+    
+    // 禁用键盘中断
+    outb(0x64, 0xAD);
+    
+    // 清空键盘缓冲区
+    while ((inb(0x64) & 0x01) != 0) {
+        inb(0x60);
+    }
+    
+    // 重新启用键盘
+    outb(0x64, 0xAE);
+    
+    // 发送键盘重置命令
+    outb(0x64, 0xD4);
+    outb(0x60, 0xFF);
+    
+    // 等待键盘响应
+    timeout = 10000;
+    while (timeout-- > 0) {
+        if ((inb(0x64) & 0x01) != 0) {
+            uint8_t response = inb(0x60);
+            if (response == 0xFA) break; // 键盘确认
+        }
+    }
+    
+    // 设置键盘扫描码集
+    outb(0x64, 0xD4);
+    outb(0x60, 0xF0); // 设置扫描码集命令
+    outb(0x60, 0x02); // 扫描码集2
+    
+    // 等待确认
+    timeout = 10000;
+    while (timeout-- > 0) {
+        if ((inb(0x64) & 0x01) != 0) {
+            uint8_t response = inb(0x60);
+            if (response == 0xFA) break;
+        }
+    }
+}
+
+// 重置键盘（用于恢复键盘功能）
+void keyboard_reset(void) {
+    // 清空所有缓冲区
+    keyboard_state.head = 0;
+    keyboard_state.tail = 0;
+    keyboard_state.count = 0;
+    keyboard_state.event_head = 0;
+    keyboard_state.event_tail = 0;
+    keyboard_state.event_count = 0;
+    
+    // 重置修饰键状态
+    keyboard_state.shift_pressed = 0;
+    keyboard_state.ctrl_pressed = 0;
+    keyboard_state.alt_pressed = 0;
+    keyboard_state.caps_lock = 0;
+    
+    // 重置扩展扫描码状态
+    extended_scancode = 0;
+    
+    // 重新进行硬件初始化
+    keyboard_hardware_init();
 }
