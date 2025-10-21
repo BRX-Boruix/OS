@@ -9,6 +9,26 @@
 
 static struct flanterm_context *ft_ctx = NULL;
 
+// 终端历史缓冲区管理
+#define TERMINAL_HISTORY_SIZE 1000  // 历史行数
+#define TERMINAL_LINE_SIZE 256      // 每行最大字符数
+
+// 历史缓冲区结构
+typedef struct {
+    char lines[TERMINAL_HISTORY_SIZE][TERMINAL_LINE_SIZE];
+    int line_count;
+    int current_line;
+    int scroll_offset;  // 当前滚动偏移
+    int max_scroll_offset;  // 最大滚动偏移
+} terminal_history_t;
+
+static terminal_history_t terminal_history = {0};
+
+// 输出捕获系统
+static int output_capture_enabled = 0;
+static char captured_output[1024];
+static int captured_output_pos = 0;
+
 // 初始化显示系统（由内核调用）
 void display_init(struct limine_framebuffer *framebuffer) {
     if (!framebuffer) return;
@@ -87,12 +107,25 @@ void set_cursor(int x, int y) {
 
 void print_char(char c) {
     if (!ft_ctx) return;
+    
+    // 如果启用了输出捕获，将字符添加到历史缓冲区
+    if (output_capture_enabled) {
+        char str[2] = {c, '\0'};
+        terminal_capture_output(str);
+    }
+    
     flanterm_write(ft_ctx, &c, 1);
     // 不立即flush，让flanterm内部处理
 }
 
 void print_string(const char* str) {
     if (!ft_ctx || !str) return;
+    
+    // 如果启用了输出捕获，将输出添加到历史缓冲区
+    if (output_capture_enabled) {
+        terminal_capture_output(str);
+    }
+    
     flanterm_write(ft_ctx, str, shell_strlen(str));
     // 不立即flush，让flanterm内部处理
 }
@@ -223,4 +256,182 @@ void display_flush(void) {
 // 获取flanterm上下文（用于高级功能）
 struct flanterm_context* get_flanterm_context(void) {
     return ft_ctx;
+}
+
+// === 终端历史缓冲区管理函数 ===
+
+// 初始化历史缓冲区
+void terminal_history_init(void) {
+    terminal_history.line_count = 0;
+    terminal_history.current_line = 0;
+    terminal_history.scroll_offset = 0;
+    terminal_history.max_scroll_offset = 0;
+    
+    // 清空所有行
+    for (int i = 0; i < TERMINAL_HISTORY_SIZE; i++) {
+        terminal_history.lines[i][0] = '\0';
+    }
+}
+
+// 添加一行到历史缓冲区
+void terminal_history_add_line(const char* line) {
+    if (!line || terminal_history.line_count >= TERMINAL_HISTORY_SIZE) {
+        return;
+    }
+    
+    // 复制行内容
+    int i = 0;
+    while (line[i] != '\0' && i < TERMINAL_LINE_SIZE - 1) {
+        terminal_history.lines[terminal_history.line_count][i] = line[i];
+        i++;
+    }
+    terminal_history.lines[terminal_history.line_count][i] = '\0';
+    
+    terminal_history.line_count++;
+    terminal_history.current_line = terminal_history.line_count;
+    
+    // 更新最大滚动偏移
+    uint32_t screen_height = get_screen_height_chars();
+    if (terminal_history.line_count > screen_height) {
+        terminal_history.max_scroll_offset = terminal_history.line_count - screen_height;
+    } else {
+        terminal_history.max_scroll_offset = 0;
+    }
+}
+
+// 向上翻页
+void terminal_history_page_up(void) {
+    if (terminal_history.scroll_offset < terminal_history.max_scroll_offset) {
+        uint32_t screen_height = get_screen_height_chars();
+        terminal_history.scroll_offset += screen_height;
+        
+        // 确保不超过最大偏移
+        if (terminal_history.scroll_offset > terminal_history.max_scroll_offset) {
+            terminal_history.scroll_offset = terminal_history.max_scroll_offset;
+        }
+        
+        // 重新绘制屏幕
+        terminal_history_redraw();
+    }
+}
+
+// 向下翻页
+void terminal_history_page_down(void) {
+    if (terminal_history.scroll_offset > 0) {
+        uint32_t screen_height = get_screen_height_chars();
+        terminal_history.scroll_offset -= screen_height;
+        
+        // 确保不小于0
+        if (terminal_history.scroll_offset < 0) {
+            terminal_history.scroll_offset = 0;
+        }
+        
+        // 重新绘制屏幕
+        terminal_history_redraw();
+    }
+}
+
+// 向上滚动一行
+void terminal_history_scroll_up(void) {
+    if (terminal_history.scroll_offset < terminal_history.max_scroll_offset) {
+        terminal_history.scroll_offset++;
+        terminal_history_redraw();
+    }
+}
+
+// 向下滚动一行
+void terminal_history_scroll_down(void) {
+    if (terminal_history.scroll_offset > 0) {
+        terminal_history.scroll_offset--;
+        terminal_history_redraw();
+    }
+}
+
+// 重新绘制历史内容
+void terminal_history_redraw(void) {
+    if (!ft_ctx) return;
+    
+    // 清屏
+    clear_screen();
+    
+    // 计算要显示的行范围
+    uint32_t screen_height = get_screen_height_chars();
+    int start_line = terminal_history.scroll_offset;
+    int end_line = start_line + screen_height;
+    
+    // 确保不超出历史范围
+    if (end_line > terminal_history.line_count) {
+        end_line = terminal_history.line_count;
+    }
+    
+    // 显示历史行
+    for (int i = start_line; i < end_line; i++) {
+        print_string(terminal_history.lines[i]);
+        print_char('\n');
+    }
+    
+    // 显示提示符（如果不在历史模式）
+    if (terminal_history.scroll_offset == 0) {
+        // 这里可以显示当前提示符
+    }
+}
+
+// 获取当前滚动偏移
+int terminal_history_get_scroll_offset(void) {
+    return terminal_history.scroll_offset;
+}
+
+// 获取最大滚动偏移
+int terminal_history_get_max_scroll_offset(void) {
+    return terminal_history.max_scroll_offset;
+}
+
+// 检查是否在历史模式
+int terminal_history_is_in_history(void) {
+    return terminal_history.scroll_offset > 0;
+}
+
+// 启用输出捕获
+void terminal_enable_output_capture(void) {
+    output_capture_enabled = 1;
+    captured_output_pos = 0;
+    captured_output[0] = '\0';
+}
+
+// 禁用输出捕获
+void terminal_disable_output_capture(void) {
+    output_capture_enabled = 0;
+}
+
+// 捕获输出到历史缓冲区
+void terminal_capture_output(const char* str) {
+    if (!output_capture_enabled || !str) return;
+    
+    // 将输出添加到捕获缓冲区
+    int i = 0;
+    while (str[i] != '\0' && captured_output_pos < 1023) {
+        if (str[i] == '\n') {
+            // 遇到换行符，将当前行添加到历史缓冲区
+            captured_output[captured_output_pos] = '\0';
+            if (captured_output_pos > 0) {
+                terminal_history_add_line(captured_output);
+            }
+            captured_output_pos = 0;
+            captured_output[0] = '\0';
+        } else {
+            captured_output[captured_output_pos] = str[i];
+            captured_output_pos++;
+        }
+        i++;
+    }
+}
+
+// 完成输出捕获
+void terminal_finish_output_capture(void) {
+    if (output_capture_enabled && captured_output_pos > 0) {
+        captured_output[captured_output_pos] = '\0';
+        terminal_history_add_line(captured_output);
+        captured_output_pos = 0;
+    }
+    terminal_disable_output_capture();
 }

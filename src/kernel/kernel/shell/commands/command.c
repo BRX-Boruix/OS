@@ -3,6 +3,7 @@
 
 #include "command.h"
 #include "../builtin/builtin.h"
+#include "../builtin/keytest/keytest.h"
 #include "kernel/shell.h"
 #include "drivers/display.h"
 
@@ -23,6 +24,7 @@ static shell_command_t commands[] = {
     {"great", "Let the great Yang Borui give you the answer.", cmd_great},
     {"crash", "Manually trigger system crash", cmd_crash},
     {"license", "Show license information for projects", cmd_license},
+    {"keytest", "Test keyboard input and scancodes", cmd_keytest},
     //{"test", "Test command", cmd_test},
     {NULL, NULL, NULL}  // 结束标记
 };

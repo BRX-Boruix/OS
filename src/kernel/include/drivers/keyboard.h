@@ -70,6 +70,18 @@ typedef struct {
 #define KEY_F11 0x57
 #define KEY_F12 0x58
 
+// 方向键和翻页键定义
+#define KEY_UP_ARROW 0x48
+#define KEY_DOWN_ARROW 0x50
+#define KEY_LEFT_ARROW 0x4B
+#define KEY_RIGHT_ARROW 0x4D
+#define KEY_PAGE_UP 0x49
+#define KEY_PAGE_DOWN 0x51
+#define KEY_HOME 0x47
+#define KEY_END 0x4F
+#define KEY_INSERT 0x52
+#define KEY_DELETE 0x53
+
 // 键盘状态
 typedef struct {
     uint8_t buffer[KEYBOARD_BUFFER_SIZE];
