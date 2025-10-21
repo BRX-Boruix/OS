@@ -317,6 +317,9 @@ void shell_main(void) {
                 }
             }
         }
+        
+        // 定期刷新显示
+        display_flush();
     }
 }
 

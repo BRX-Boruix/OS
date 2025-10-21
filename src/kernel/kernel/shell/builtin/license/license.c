@@ -24,6 +24,13 @@ static const third_party_project_t third_party_projects[] = {
         .description = "Modern bootloader supporting BIOS and UEFI",
         .url = "https://github.com/limine-bootloader/limine.git"
     },
+    {
+        .name = "Flanterm",
+        .version = "2022-2025",
+        .license = "BSD License",
+        .description = "Fast terminal emulator with framebuffer backend",
+        .url = "https://codeberg.org/Mintsuki/Flanterm.git"
+    },
     {NULL, NULL, NULL, NULL, NULL}  // 结束标记
 };
 
@@ -104,6 +111,31 @@ static void show_limine_license(void) {
     print_string("OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n");
 }
 
+// 显示Flanterm许可证信息
+static void show_flanterm_license(void) {
+    print_string("FLANTERM LICENSE\n");
+    print_string("===============\n\n");
+    
+    print_string("Copyright (C) 2022-2025 mintsuki and contributors.\n\n");
+    print_string("Redistribution and use in source and binary forms, with or without\n");
+    print_string("modification, are permitted provided that the following conditions are met:\n\n");
+    print_string("1. Redistributions of source code must retain the above copyright notice, this\n");
+    print_string("   list of conditions and the following disclaimer.\n\n");
+    print_string("2. Redistributions in binary form must reproduce the above copyright notice,\n");
+    print_string("   this list of conditions and the following disclaimer in the documentation\n");
+    print_string("   and/or other materials provided with the distribution.\n\n");
+    print_string("THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND\n");
+    print_string("ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED\n");
+    print_string("WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE\n");
+    print_string("DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE\n");
+    print_string("FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL\n");
+    print_string("DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR\n");
+    print_string("SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER\n");
+    print_string("CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,\n");
+    print_string("OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE\n");
+    print_string("OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n\n");
+}
+
 
 // 显示帮助信息
 static void show_help(void) {
@@ -115,6 +147,7 @@ static void show_help(void) {
     print_string("  projects     - Show third-party projects list\n");
     print_string("  project      - Show Boruix OS license\n");
     print_string("  limine       - Show Limine bootloader license\n");
+    print_string("  flanterm     - Show Flanterm terminal license\n");
     print_string("  help         - Show this help message\n\n");
 }
 
@@ -126,6 +159,8 @@ void cmd_license(int argc, char* argv[]) {
         show_project_license();
         print_string("========================================\n\n");
         show_limine_license();
+        print_string("========================================\n\n");
+        show_flanterm_license();
         return;
     }
     
@@ -138,6 +173,8 @@ void cmd_license(int argc, char* argv[]) {
         show_project_license();
     } else if (shell_strcmp(option, "limine") == 0) {
         show_limine_license();
+    } else if (shell_strcmp(option, "flanterm") == 0) {
+        show_flanterm_license();
     } else if (shell_strcmp(option, "help") == 0) {
         show_help();
     } else {

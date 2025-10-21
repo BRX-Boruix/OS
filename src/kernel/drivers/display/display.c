@@ -1,214 +1,226 @@
-// Boruix OS 显示驱动 - Framebuffer适配层
-// 兼容原VGA接口，底层使用framebuffer实现
+// Boruix OS 显示驱动 - 使用Flanterm库
+// 基于flanterm的现代终端实现
 
 #include "drivers/display.h"
 #include "kernel/limine.h"
-#include "font.h"
+#include "../flanterm/flanterm.h"
+#include "../flanterm/flanterm_backends/fb.h"
+#include "../../kernel/shell/utils/string.h"
 
-static struct limine_framebuffer *fb = NULL;
-static uint32_t cursor_x = 0;
-static uint32_t cursor_y = 0;
-static uint32_t fg_color = 0xFFFFFF;
-static uint32_t bg_color = 0x000000;
-
-// 屏幕滚动相关变量
-static uint32_t screen_width_chars = 0;  // 屏幕宽度（字符数）
-static uint32_t screen_height_chars = 0; // 屏幕高度（字符数）
-static uint32_t scroll_offset = 0;       // 当前滚动偏移量
+static struct flanterm_context *ft_ctx = NULL;
 
 // 初始化显示系统（由内核调用）
 void display_init(struct limine_framebuffer *framebuffer) {
-    fb = framebuffer;
-    cursor_x = 0;
-    cursor_y = 0;
-    scroll_offset = 0;
+    if (!framebuffer) return;
     
-    // 计算屏幕尺寸（字符数）
-    screen_width_chars = fb->width / font_get_width();
-    screen_height_chars = fb->height / font_get_height();
-}
-
-static void putpixel(uint32_t x, uint32_t y, uint32_t color) {
-    if (!fb || x >= fb->width || y >= fb->height) return;
-    uint32_t *pixel = (uint32_t *)((uint8_t *)fb->address + y * fb->pitch + x * 4);
-    *pixel = color;
+    // 初始化flanterm framebuffer后端
+    ft_ctx = flanterm_fb_init(
+        NULL,  // malloc函数（使用默认）
+        NULL,  // free函数（使用默认）
+        (uint32_t*)framebuffer->address,
+        framebuffer->width,
+        framebuffer->height,
+        framebuffer->pitch,
+        framebuffer->red_mask_size,
+        framebuffer->red_mask_shift,
+        framebuffer->green_mask_size,
+        framebuffer->green_mask_shift,
+        framebuffer->blue_mask_size,
+        framebuffer->blue_mask_shift,
+        NULL,  // canvas
+        NULL,  // ansi_colours
+        NULL,  // ansi_bright_colours
+        NULL,  // default_bg
+        NULL,  // default_fg
+        NULL,  // default_bg_bright
+        NULL,  // default_fg_bright
+        NULL,  // font
+        0,     // font_width
+        0,     // font_height
+        1,     // font_spacing
+        0,     // font_scale_x (自动)
+        0,     // font_scale_y (自动)
+        0      // margin
+    );
 }
 
 void clear_screen(void) {
-    if (!fb) return;
-    for (uint32_t i = 0; i < fb->height * fb->width; i++) {
-        ((uint32_t *)fb->address)[i] = bg_color;
-    }
-    cursor_x = 0;
-    cursor_y = 0;
-    scroll_offset = 0;
+    if (!ft_ctx) return;
+    // 使用ANSI转义序列清屏
+    flanterm_write(ft_ctx, "\033[2J", 4);
+    flanterm_write(ft_ctx, "\033[H", 3);  // 移动光标到左上角
+    flanterm_flush(ft_ctx);
 }
 
-
-void print_char(char c) {
-    if (!fb) return;
-    
-    if (c == '\n') {
-        cursor_x = 0;
-        cursor_y += font_get_height();
-        if (cursor_y + font_get_height() > fb->height) {
-            // 当光标超出屏幕时，向上滚动而不是重置
-            scroll_screen_up();
-            cursor_y = fb->height - font_get_height(); // 将光标放在最后一行
-        }
-        return;
-    }
-    
-    if (c == '\r') {
-        cursor_x = 0;
-        return;
-    }
-    
-    if (c == '\b') {
-        // 退格键：向左移动光标并清除字符
-        if (cursor_x >= font_get_width()) {
-            cursor_x -= font_get_width();
-            // 清除当前位置的字符（用背景色填充）
-            for (int row = 0; row < font_get_height(); row++) {
-                for (int col = 0; col < font_get_width(); col++) {
-                    putpixel(cursor_x + col, cursor_y + row, bg_color);
-                }
-            }
-        }
-        return;
-    }
-    
-    // 绘制字符
-    const uint8_t *glyph = font_get_glyph((uint8_t)c);
-    
-    for (int row = 0; row < font_get_height(); row++) {
-        for (int col = 0; col < font_get_width(); col++) {
-            // 反转位顺序：从右到左读取（0表示最左边像素）
-            uint32_t color = (glyph[row] & (1 << col)) ? fg_color : bg_color;
-            putpixel(cursor_x + col, cursor_y + row, color);
-        }
-    }
-    
-    cursor_x += font_get_width();
-    if (cursor_x + font_get_width() > fb->width) {
-        cursor_x = 0;
-        cursor_y += font_get_height();
-        if (cursor_y + font_get_height() > fb->height) {
-            // 当光标超出屏幕时，向上滚动而不是重置
-            scroll_screen_up();
-            cursor_y = fb->height - font_get_height(); // 将光标放在最后一行
-        }
-    }
-}
-
-void print_string(const char *str) {
-    while (*str) {
-        print_char(*str++);
-    }
-}
-
-void print_hex(uint64_t value) {
-    char hex_chars[] = "0123456789ABCDEF";
-    print_string("0x");
-    
-    int started = 0;
-    for (int i = 60; i >= 0; i -= 4) {
-        uint8_t digit = (value >> i) & 0xF;
-        if (digit != 0 || started || i == 0) {
-            print_char(hex_chars[digit]);
-            started = 1;
-        }
-    }
-}
-
-void print_dec(uint32_t value) {
-    if (value == 0) {
-        print_char('0');
-        return;
-    }
-    
-    char buffer[12];
+void set_cursor(int x, int y) {
+    if (!ft_ctx) return;
+    // 使用ANSI转义序列设置光标位置
+    char buffer[32];
     int i = 0;
     
-    while (value > 0) {
-        buffer[i++] = '0' + (value % 10);
-        value /= 10;
+    buffer[i++] = '\033';
+    buffer[i++] = '[';
+    
+    // 转换y坐标
+    if (y + 1 >= 10) {
+        buffer[i++] = '0' + ((y + 1) / 10);
+        buffer[i++] = '0' + ((y + 1) % 10);
+    } else {
+        buffer[i++] = '0' + (y + 1);
     }
     
-    while (--i >= 0) {
-        print_char(buffer[i]);
-    }
-}
-
-void set_color(uint8_t fg, uint8_t bg) {
-    // VGA颜色到RGB转换（简化版）
-    uint32_t colors[16] = {
-        0x000000, 0x0000AA, 0x00AA00, 0x00AAAA,
-        0xAA0000, 0xAA00AA, 0xAA5500, 0xAAAAAA,
-        0x555555, 0x5555FF, 0x55FF55, 0x55FFFF,
-        0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF
-    };
+    buffer[i++] = ';';
     
-    if (fg < 16) fg_color = colors[fg];
-    if (bg < 16) bg_color = colors[bg];
+    // 转换x坐标
+    if (x + 1 >= 10) {
+        buffer[i++] = '0' + ((x + 1) / 10);
+        buffer[i++] = '0' + ((x + 1) % 10);
+    } else {
+        buffer[i++] = '0' + (x + 1);
+    }
+    
+    buffer[i++] = 'H';
+    
+    flanterm_write(ft_ctx, buffer, i);
+    flanterm_flush(ft_ctx);
 }
 
-// 屏幕滚动相关函数实现
+void print_char(char c) {
+    if (!ft_ctx) return;
+    flanterm_write(ft_ctx, &c, 1);
+    // 不立即flush，让flanterm内部处理
+}
+
+void print_string(const char* str) {
+    if (!ft_ctx || !str) return;
+    flanterm_write(ft_ctx, str, shell_strlen(str));
+    // 不立即flush，让flanterm内部处理
+}
+
+void delay(int count) {
+    // 简单的延迟实现
+    for (volatile int i = 0; i < count * 1000; i++);
+}
+
+// 屏幕滚动相关函数（flanterm自动处理）
 void scroll_screen_up(void) {
-    if (!fb) return;
-    
-    // 将整个屏幕内容向上移动一行（字体高度像素）
-    uint32_t line_size = fb->pitch * font_get_height(); // 一行的大小（字节）
-    
-    // 从第二行开始，将内容向上复制
-    uint8_t *src = (uint8_t *)fb->address + line_size;
-    uint8_t *dst = (uint8_t *)fb->address;
-    
-    // 使用更安全的内存移动方式
-    // 逐行复制，避免内存重叠问题
-    for (uint32_t line = 0; line < (fb->height - font_get_height()); line += font_get_height()) {
-        uint8_t *src_line = src + line * fb->pitch;
-        uint8_t *dst_line = dst + line * fb->pitch;
-        for (uint32_t i = 0; i < line_size; i++) {
-            dst_line[i] = src_line[i];
-        }
-    }
-    
-    // 清除最后一行
-    uint8_t *last_line = (uint8_t *)fb->address + (fb->height - font_get_height()) * fb->pitch;
-    for (uint32_t y = 0; y < font_get_height(); y++) {
-        for (uint32_t x = 0; x < fb->width; x++) {
-            uint32_t *pixel = (uint32_t *)(last_line + y * fb->pitch + x * 4);
-            *pixel = bg_color;
-        }
-    }
-    
-    // 更新滚动偏移量
-    scroll_offset++;
+    // flanterm自动处理滚动，无需手动实现
 }
 
-// 获取屏幕尺寸信息
 uint32_t get_screen_width_chars(void) {
-    return screen_width_chars;
+    if (!ft_ctx) return 0;
+    size_t cols, rows;
+    flanterm_get_dimensions(ft_ctx, &cols, &rows);
+    return (uint32_t)cols;
 }
 
 uint32_t get_screen_height_chars(void) {
-    return screen_height_chars;
+    if (!ft_ctx) return 0;
+    size_t cols, rows;
+    flanterm_get_dimensions(ft_ctx, &cols, &rows);
+    return (uint32_t)rows;
 }
 
 uint32_t get_scroll_offset(void) {
-    return scroll_offset;
+    // flanterm内部管理滚动，返回0表示当前实现
+    return 0;
 }
 
-// 设置光标位置
-void set_cursor(int x, int y) {
-    if (!fb) return;
+// 辅助打印函数
+void print_hex(uint64_t value) {
+    char buffer[32];
+    char hex_chars[] = "0123456789ABCDEF";
+    int i = 0;
     
-    // 将字符坐标转换为像素坐标
-    cursor_x = x * font_get_width();
-    cursor_y = y * font_get_height();
+    buffer[i++] = '0';
+    buffer[i++] = 'x';
     
-    // 确保光标位置在有效范围内
-    if (cursor_x >= fb->width) cursor_x = fb->width - font_get_width();
-    if (cursor_y >= fb->height) cursor_y = fb->height - font_get_height();
+    if (value == 0) {
+        buffer[i++] = '0';
+    } else {
+        // 从高位开始转换
+        int started = 0;
+        for (int shift = 60; shift >= 0; shift -= 4) {
+            uint8_t digit = (value >> shift) & 0xF;
+            if (digit != 0 || started || shift == 0) {
+                buffer[i++] = hex_chars[digit];
+                started = 1;
+            }
+        }
+    }
+    
+    buffer[i] = '\0';
+    print_string(buffer);
+}
+
+void print_dec(uint32_t value) {
+    char buffer[32];
+    int i = 0;
+    
+    if (value == 0) {
+        buffer[i++] = '0';
+    } else {
+        // 从低位开始转换
+        char temp[32];
+        int j = 0;
+        while (value > 0) {
+            temp[j++] = '0' + (value % 10);
+            value /= 10;
+        }
+        // 反转
+        while (j > 0) {
+            buffer[i++] = temp[--j];
+        }
+    }
+    
+    buffer[i] = '\0';
+    print_string(buffer);
+}
+
+// 颜色设置（flanterm支持ANSI颜色）
+void set_color(uint8_t fg, uint8_t bg) {
+    if (!ft_ctx) return;
+    
+    // 使用ANSI转义序列设置颜色
+    char buffer[32];
+    int i = 0;
+    
+    buffer[i++] = '\033';
+    buffer[i++] = '[';
+    
+    // 设置前景色
+    int fg_val = 30 + fg;
+    if (fg_val >= 10) {
+        buffer[i++] = '0' + (fg_val / 10);
+        buffer[i++] = '0' + (fg_val % 10);
+    } else {
+        buffer[i++] = '0' + fg_val;
+    }
+    
+    buffer[i++] = ';';
+    
+    // 设置背景色
+    int bg_val = 40 + bg;
+    if (bg_val >= 10) {
+        buffer[i++] = '0' + (bg_val / 10);
+        buffer[i++] = '0' + (bg_val % 10);
+    } else {
+        buffer[i++] = '0' + bg_val;
+    }
+    
+    buffer[i++] = 'm';
+    
+    flanterm_write(ft_ctx, buffer, i);
+    flanterm_flush(ft_ctx);
+}
+
+// 手动刷新显示
+void display_flush(void) {
+    if (!ft_ctx) return;
+    flanterm_flush(ft_ctx);
+}
+
+// 获取flanterm上下文（用于高级功能）
+struct flanterm_context* get_flanterm_context(void) {
+    return ft_ctx;
 }
