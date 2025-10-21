@@ -1,11 +1,14 @@
 // Boruix OS 显示模块头文件
-// Framebuffer适配层（兼容原VGA接口）
+// 基于Flanterm的现代终端实现
 
 #ifndef BORUIX_DISPLAY_H
 #define BORUIX_DISPLAY_H
 
 #include "kernel/types.h"
 #include "kernel/limine.h"
+
+// 前向声明flanterm上下文
+struct flanterm_context;
 
 // 初始化函数（内核启动时调用）
 void display_init(struct limine_framebuffer *framebuffer);
@@ -32,5 +35,8 @@ void set_color(uint8_t fg, uint8_t bg);
 
 // 手动刷新显示
 void display_flush(void);
+
+// 获取flanterm上下文（用于高级功能）
+struct flanterm_context* get_flanterm_context(void);
 
 #endif // BORUIX_DISPLAY_H
