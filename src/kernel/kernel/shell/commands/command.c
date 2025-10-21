@@ -22,6 +22,7 @@ static shell_command_t commands[] = {
     {"reboot", "Reboot system", cmd_reboot},
     {"great", "Let the great Yang Borui give you the answer.", cmd_great},
     {"crash", "Manually trigger system crash", cmd_crash},
+    {"license", "Show license information for projects", cmd_license},
     //{"test", "Test command", cmd_test},
     {NULL, NULL, NULL}  // 结束标记
 };

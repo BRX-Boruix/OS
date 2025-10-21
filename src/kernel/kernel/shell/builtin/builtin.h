@@ -19,5 +19,6 @@
 #include "irqtest/irqtest.h"
 #include "great/great.h"
 #include "crash/crash.h"
+#include "license/license.h"
 
 #endif // BUILTIN_H
