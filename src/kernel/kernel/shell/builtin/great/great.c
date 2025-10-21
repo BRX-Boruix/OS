@@ -40,6 +40,7 @@ static const char* crazy_quotes[] = {
     "EpieiKeia216 Best",
     "What does it mean?",
     "No swinging on the swing in the operating system.",
+    "33550336",
     NULL  // 结束标记
 };
 
