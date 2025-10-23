@@ -3,7 +3,7 @@
 
 use crate::arch::{MemoryRegion, MemoryType};
 use crate::hhdm;
-use crate::physical_simple::PhysFrame;
+use crate::lazy_buddy::PhysFrame;
 use crate::MemoryManager;
 use core::ptr;
 use core::slice;
