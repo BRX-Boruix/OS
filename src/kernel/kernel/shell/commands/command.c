@@ -7,6 +7,9 @@
 #include "kernel/shell.h"
 #include "drivers/display.h"
 
+// 声明memtest命令函数
+void cmd_memtest(int argc, char* argv[]);
+
 // 命令表
 static shell_command_t commands[] = {
     {"help", "Show available commands", cmd_help},
@@ -25,6 +28,7 @@ static shell_command_t commands[] = {
     {"crash", "Manually trigger system crash", cmd_crash},
     {"license", "Show license information for projects", cmd_license},
     {"keytest", "Test keyboard input and scancodes", cmd_keytest},
+    {"memtest", "Test TTY memory management and page tables", cmd_memtest},
     //{"test", "Test command", cmd_test},
     {NULL, NULL, NULL}  // 结束标记
 };
