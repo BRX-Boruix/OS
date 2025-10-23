@@ -52,52 +52,58 @@ static void double_fault_handler(registers_t* regs) {
     __asm__ volatile("cli");
     
     print_string("\n");
-    print_string("###########################################################\n");
-    print_string("#                                                         #\n");
-    print_string("#              DOUBLE FAULT DETECTED!                     #\n");
-    print_string("#                                                         #\n");
-    print_string("#  A double fault occurred - this means an exception     #\n");
-    print_string("#  happened while handling another exception.            #\n");
-    print_string("#                                                         #\n");
-    print_string("#  Using independent stack (IST1) for safe handling.     #\n");
-    print_string("#                                                         #\n");
-    print_string("###########################################################\n");
+    print_string("###############################################################################\n");
+    print_string("#                                                                             #\n");
+    print_string("#                           BORUIX KERNEL PANIC                               #\n");
+    print_string("#                                                                             #\n");
+    print_string("#  The kernel crashed.                                                        #\n");
+    print_string("#  The first level of error interception (SYSTEM HAS DEAD PAGE) is not caught #\n");
+    print_string("#  , which is a very serious problem.                                         #\n");
+    print_string("#  This is a protected page to provide as much critical information as        #\n");
+    print_string("#  possible.                                                                  #\n");
+    print_string("#  Please go to https://os.boruix.thelang.cn/terrible/help for                #\n");
+    print_string("#  documentation.                                                             #\n");
+    print_string("#                                                                             #\n");
+    print_string("###############################################################################\n");
     print_string("\n");
     
-    print_string("[DOUBLE FAULT] System State Dump:\n");
-    print_string("  Error Code: 0x");
+    print_string("DOUBLE FAULT DETECTED!\n");
+    print_string("A double fault occurred - this means an exception happened while handling\n");
+    print_string("another exception. Using independent stack (IST1) for safe handling.\n\n");
+    
+    print_string("=== SYSTEM STATE DUMP ===\n");
+    print_string("Error Code: 0x");
     print_hex((uint32_t)regs->err_code);
     print_string("\n");
     
-    print_string("  RIP (Instruction): 0x");
+    print_string("RIP (Instruction): 0x");
     print_hex((uint32_t)(regs->rip >> 32));
     print_hex((uint32_t)regs->rip);
     print_string("\n");
     
-    print_string("  RSP (Stack):       0x");
+    print_string("RSP (Stack):       0x");
     print_hex((uint32_t)(regs->rsp >> 32));
     print_hex((uint32_t)regs->rsp);
     print_string("\n");
     
-    print_string("  RBP (Base):        0x");
+    print_string("RBP (Base):        0x");
     print_hex((uint32_t)(regs->rbp >> 32));
     print_hex((uint32_t)regs->rbp);
     print_string("\n");
     
-    print_string("  CS:  0x");
+    print_string("CS:  0x");
     print_hex((uint32_t)regs->cs);
     print_string("  SS:  0x");
     print_hex((uint32_t)regs->ss);
     print_string("\n");
     
-    print_string("  RFLAGS: 0x");
+    print_string("RFLAGS: 0x");
     print_hex((uint32_t)(regs->rflags >> 32));
     print_hex((uint32_t)regs->rflags);
-    print_string("\n");
+    print_string("\n\n");
     
-    print_string("\n");
-    print_string("[DOUBLE FAULT] General Purpose Registers:\n");
-    print_string("  RAX: 0x");
+    print_string("=== GENERAL PURPOSE REGISTERS ===\n");
+    print_string("RAX: 0x");
     print_hex((uint32_t)(regs->rax >> 32));
     print_hex((uint32_t)regs->rax);
     print_string("  RBX: 0x");
@@ -105,7 +111,7 @@ static void double_fault_handler(registers_t* regs) {
     print_hex((uint32_t)regs->rbx);
     print_string("\n");
     
-    print_string("  RCX: 0x");
+    print_string("RCX: 0x");
     print_hex((uint32_t)(regs->rcx >> 32));
     print_hex((uint32_t)regs->rcx);
     print_string("  RDX: 0x");
@@ -113,17 +119,16 @@ static void double_fault_handler(registers_t* regs) {
     print_hex((uint32_t)regs->rdx);
     print_string("\n");
     
-    print_string("  RSI: 0x");
+    print_string("RSI: 0x");
     print_hex((uint32_t)(regs->rsi >> 32));
     print_hex((uint32_t)regs->rsi);
     print_string("  RDI: 0x");
     print_hex((uint32_t)(regs->rdi >> 32));
     print_hex((uint32_t)regs->rdi);
-    print_string("\n");
+    print_string("\n\n");
     
-    print_string("\n");
-    print_string("[DOUBLE FAULT] Extended Registers:\n");
-    print_string("  R8:  0x");
+    print_string("=== EXTENDED REGISTERS ===\n");
+    print_string("R8:  0x");
     print_hex((uint32_t)(regs->r8 >> 32));
     print_hex((uint32_t)regs->r8);
     print_string("  R9:  0x");
@@ -131,7 +136,7 @@ static void double_fault_handler(registers_t* regs) {
     print_hex((uint32_t)regs->r9);
     print_string("\n");
     
-    print_string("  R10: 0x");
+    print_string("R10: 0x");
     print_hex((uint32_t)(regs->r10 >> 32));
     print_hex((uint32_t)regs->r10);
     print_string("  R11: 0x");
@@ -139,7 +144,7 @@ static void double_fault_handler(registers_t* regs) {
     print_hex((uint32_t)regs->r11);
     print_string("\n");
     
-    print_string("  R12: 0x");
+    print_string("R12: 0x");
     print_hex((uint32_t)(regs->r12 >> 32));
     print_hex((uint32_t)regs->r12);
     print_string("  R13: 0x");
@@ -147,19 +152,22 @@ static void double_fault_handler(registers_t* regs) {
     print_hex((uint32_t)regs->r13);
     print_string("\n");
     
-    print_string("  R14: 0x");
+    print_string("R14: 0x");
     print_hex((uint32_t)(regs->r14 >> 32));
     print_hex((uint32_t)regs->r14);
     print_string("  R15: 0x");
     print_hex((uint32_t)(regs->r15 >> 32));
     print_hex((uint32_t)regs->r15);
-    print_string("\n");
+    print_string("\n\n");
     
-    print_string("\n");
-    print_string("###########################################################\n");
-    print_string("# System cannot recover from double fault.                #\n");
-    print_string("# Please reboot the system.                               #\n");
-    print_string("###########################################################\n");
+    print_string("###############################################################################\n");
+    print_string("#                                                                             #\n");
+    print_string("#  System cannot recover from double fault.                                   #\n");
+    print_string("#  Please reboot the system.                                                  #\n");
+    print_string("#                                                                             #\n");
+    print_string("#                              TERRIBLE KERNEL                                #\n");
+    print_string("#                                                                             #\n");
+    print_string("###############################################################################\n");
     
     // 无限循环，等待重启
     while(1) {
@@ -183,7 +191,7 @@ void isr_handler(registers_t* regs) {
         // 其他异常的通用处理
         __asm__ volatile("cli");
         print_string("\n========================================\n");
-        print_string("\nSYSTEAM IS DIED. \n");
+        print_string("\nSYSTEAM HAS DEAD. \n");
         print_string("\n========================================\n");
         print_string("[EXCEPTION] ");
         print_string(exception_messages[int_no]);

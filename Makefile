@@ -71,9 +71,10 @@ RUST_PROJECTS := $(shell find $(SRC_DIR) -name "Cargo.toml" -exec dirname {} \; 
 # 生成Rust库文件列表（明确指定已知的库文件）
 RUST_LIBS := $(SRC_DIR)/memory_rust/librust_memory.a
 
-# 生成对象文件列表
-KERNEL_C_OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_ARCH_DIR)/%.o,$(KERNEL_SRCS))
-KERNEL_ASM_OBJS = $(patsubst $(SRC_DIR)/%.asm,$(BUILD_ARCH_DIR)/%.o,$(KERNEL_ASM_SRCS))
+# 生成对象文件列表（加上语言后缀避免C和ASM重名）
+# 格式：父文件夹-文件名-语言.o
+KERNEL_C_OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_ARCH_DIR)/%-c.o,$(KERNEL_SRCS))
+KERNEL_ASM_OBJS = $(patsubst $(SRC_DIR)/%.asm,$(BUILD_ARCH_DIR)/%-asm.o,$(KERNEL_ASM_SRCS))
 KERNEL_OBJS = $(KERNEL_C_OBJS) $(KERNEL_ASM_OBJS) $(RUST_LIBS)
 
 LINKER_SCRIPT = $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/linker.ld
@@ -91,6 +92,16 @@ $(BUILD_ARCH_DIR):
 # 复制链接器脚本到构建目录
 $(BUILD_ARCH_DIR)/linker.ld: $(LINKER_SCRIPT) | $(BUILD_ARCH_DIR)
 	cp $< $@
+
+# C源文件编译规则（新命名方式：文件名-c.o）
+$(BUILD_ARCH_DIR)/%-c.o: $(SRC_DIR)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -I$(SRC_DIR)/kernel/include -c $< -o $@
+
+# 汇编文件编译规则（新命名方式：文件名-asm.o）
+$(BUILD_ARCH_DIR)/%-asm.o: $(SRC_DIR)/%.asm
+	@mkdir -p $(dir $@)
+	$(AS) $(ASFLAGS) $< -o $@
 
 # 确保Limine存在
 $(LIMINE_DIR)/limine:

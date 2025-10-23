@@ -9,6 +9,7 @@
 #include "kernel/tty.h"
 #include "kernel/serial_debug.h"
 #include "arch/tss.h"
+#include "arch/gdt.h"
 
 // Limine requests
 __attribute__((used, section(".requests")))
@@ -124,6 +125,11 @@ void kmain(void) {
     print_string("Initializing TSS (Task State Segment)...\n");
     tss_init();
     print_string("TSS initialized!\n");
+    
+    // 初始化GDT（包含TSS描述符）
+    print_string("Initializing GDT (Global Descriptor Table)...\n");
+    gdt_init();
+    print_string("GDT initialized!\n");
     
     // 初始化中断系统
     print_string("Initializing interrupt system...\n");
