@@ -29,7 +29,18 @@ jobs:
           binutils \
           xorriso \
           mtools \
-          git
+          git \
+          curl
+    
+    # 安装Rust工具链
+    - name: Install Rust toolchain
+      run: |
+        echo "Installing Rust toolchain..."
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        source $HOME/.cargo/env
+        rustup target add x86_64-unknown-none
+        rustup component add rust-src
+        echo "Rust toolchain installed successfully"
     
     # 安装Limine
     - name: Install Limine
@@ -41,6 +52,7 @@ jobs:
     - name: Build x86_64
       run: |
         echo "Building for architecture: x86_64"
+        source $HOME/.cargo/env
         make clean
         make all
     
