@@ -46,16 +46,17 @@ impl MemoryManager {
     }
 
     /// 初始化内存管理器
+    /// 阶段2: 只初始化物理内存分配器
     pub fn init(&mut self, memory_map: &[arch::MemoryRegion]) -> Result<(), &'static str> {
         // 初始化物理内存分配器
         self.physical_allocator.init(memory_map)?;
 
-        // 初始化页表管理器
-        self.page_table_manager.init(&mut self.physical_allocator)?;
+        // 阶段2: 暂不初始化页表管理器
+        // self.page_table_manager.init(&mut self.physical_allocator)?;
 
-        // 初始化内核堆
-        self.kernel_heap
-            .init(&mut self.physical_allocator, &mut self.page_table_manager)?;
+        // 阶段2: 暂不初始化内核堆
+        // self.kernel_heap
+        //     .init(&mut self.physical_allocator, &mut self.page_table_manager)?;
 
         // 初始化统计信息
         self.stats.init(memory_map);
