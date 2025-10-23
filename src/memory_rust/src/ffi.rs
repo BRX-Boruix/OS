@@ -2,9 +2,25 @@
 //! 实现页面分配功能
 
 use crate::arch::{MemoryRegion, MemoryType};
+use crate::hhdm;
+use crate::physical_simple::PhysFrame;
 use crate::MemoryManager;
 use core::ptr;
 use core::slice;
+
+// C串口调试函数声明
+extern "C" {
+    fn serial_puts(s: *const u8);
+}
+
+// 串口调试宏
+macro_rules! serial_log {
+    ($msg:expr) => {
+        unsafe {
+            serial_puts(concat!("[RUST] ", $msg, "\n\0").as_ptr());
+        }
+    };
+}
 
 /// C兼容的内存区域结构
 #[repr(C)]
@@ -30,6 +46,13 @@ impl From<CMemoryRegion> for MemoryRegion {
     }
 }
 
+/// 设置HHDM偏移量
+/// 必须在rust_memory_init之前调用
+#[no_mangle]
+pub extern "C" fn rust_set_hhdm_offset(offset: u64) {
+    hhdm::set_offset(offset);
+}
+
 /// 初始化Rust内存管理器
 /// 阶段2: 真实初始化物理分配器
 #[no_mangle]
@@ -37,30 +60,48 @@ pub extern "C" fn rust_memory_init(
     memory_regions: *const CMemoryRegion,
     region_count: usize,
 ) -> i32 {
+    serial_log!("rust_memory_init() called");
+    
     if memory_regions.is_null() || region_count == 0 {
+        serial_log!("ERROR: Invalid memory regions pointer or count");
         return -1;
     }
-
+    
+    serial_log!("Converting memory regions...");
     // 转换C内存区域到Rust格式
     let c_regions = unsafe { slice::from_raw_parts(memory_regions, region_count) };
     let mut rust_regions = [MemoryRegion::new(0, 0, MemoryType::Reserved); 32];
 
     if region_count > rust_regions.len() {
+        serial_log!("ERROR: Too many memory regions");
         return -1;
     }
 
     for (i, c_region) in c_regions.iter().enumerate() {
         rust_regions[i] = (*c_region).into();
     }
-
+    
+    serial_log!("Creating memory manager...");
     // 创建并初始化内存管理器
     let mut manager = MemoryManager::new();
+    
+    serial_log!("Initializing memory manager...");
     match manager.init(&rust_regions[..region_count]) {
         Ok(()) => {
+            serial_log!("Memory manager init OK, setting instance...");
             MemoryManager::set_instance(manager);
+            serial_log!("rust_memory_init() SUCCESS");
             0
         }
-        Err(_) => -1,
+        Err(e) => {
+            serial_log!("ERROR: Memory manager init failed");
+            unsafe {
+                serial_puts(b"[RUST] Error message: \0".as_ptr());
+                serial_puts(e.as_ptr());
+                serial_puts(b"\n\0".as_ptr());
+            }
+            -1
+        },
     }
 }
 
@@ -82,16 +123,29 @@ pub extern "C" fn rust_kfree(_ptr: *mut u8) {
 /// 阶段2: 真实实现
 #[no_mangle]
 pub extern "C" fn rust_alloc_page() -> u64 {
+    serial_log!("rust_alloc_page() called");
+    
     // 获取全局内存管理器实例
     let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
         Some(m) => m,
-        None => return 0,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return 0;
+        }
     };
 
+    serial_log!("Calling allocate_frame()...");
     // 使用物理分配器分配页面
     match manager.physical_allocator.allocate_frame() {
-        Some(frame) => frame.start_address().as_u64(),
-        None => 0,
+        Some(frame) => {
+            let addr = frame.start_address().as_u64();
+            serial_log!("Page allocated successfully");
+            addr
+        },
+        None => {
+            serial_log!("ERROR: Failed to allocate page");
+            0
+        }
     }
 }
 
@@ -111,7 +165,6 @@ pub extern "C" fn rust_free_page(page_addr: u64) {
 
     // 使用物理分配器释放页面
     use crate::arch::addr::PhysAddr;
-    use crate::physical::PhysFrame;
 
     let frame = PhysFrame::from_start_address(PhysAddr::new(page_addr));
     manager.physical_allocator.deallocate_frame(frame);

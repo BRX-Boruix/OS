@@ -117,6 +117,14 @@ typedef struct {
 #define RUST_PAGE_NO_EXECUTE        0x8000000000000000ULL
 
 /**
+ * 设置HHDM (Higher Half Direct Map) 偏移量
+ * 必须在rust_memory_init之前调用
+ * 
+ * @param offset HHDM偏移量（Limine提供）
+ */
+void rust_set_hhdm_offset(uint64_t offset);
+
+/**
  * 初始化Rust内存管理器
  * 
  * @param memory_regions 内存区域数组指针

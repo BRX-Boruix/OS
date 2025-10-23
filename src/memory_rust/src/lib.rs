@@ -10,8 +10,10 @@ pub mod allocator;
 pub mod arch;
 pub mod ffi;
 pub mod heap;
+pub mod hhdm;  // HHDM支持
 pub mod paging;
 pub mod physical;
+pub mod physical_simple;  // 阶段2使用简化版本
 pub mod stats;
 
 // 导出主要接口
@@ -27,8 +29,9 @@ pub use stats::*;
 static mut MEMORY_MANAGER: Option<MemoryManager> = None;
 
 /// 内存管理器主结构
+/// 阶段2: 使用简化的位图物理分配器（稳定版本）
 pub struct MemoryManager {
-    physical_allocator: physical::PhysicalAllocator,
+    physical_allocator: physical_simple::PhysicalAllocator,
     page_table_manager: paging::PageTableManager,
     kernel_heap: heap::KernelHeap,
     stats: stats::MemoryStats,
@@ -36,9 +39,10 @@ pub struct MemoryManager {
 
 impl MemoryManager {
     /// 创建新的内存管理器
+    /// 阶段2: 使用简化的位图物理分配器
     pub const fn new() -> Self {
         Self {
-            physical_allocator: physical::PhysicalAllocator::new(),
+            physical_allocator: physical_simple::PhysicalAllocator::new(),
             page_table_manager: paging::PageTableManager::new(),
             kernel_heap: heap::KernelHeap::new(),
             stats: stats::MemoryStats::new(),
