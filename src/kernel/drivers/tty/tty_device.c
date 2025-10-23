@@ -3,8 +3,11 @@
 
 #include "kernel/tty.h"
 #include "drivers/display.h"
-#include "kernel/memory.h"
 #include "../../kernel/shell/utils/string.h"
+
+// TTY专用内存管理函数
+extern void* tty_kmalloc(size_t size);
+extern void tty_kfree(void* ptr);
 
 // 设备链表头
 static tty_device_t *tty_device_list = NULL;
@@ -123,7 +126,7 @@ tty_device_t *tty_alloc_device(tty_device_type_t type) {
     }
     print_string("\n");
     
-    tty_device_t *device = (tty_device_t *)kmalloc(sizeof(tty_device_t));
+    tty_device_t *device = (tty_device_t *)tty_kmalloc(sizeof(tty_device_t));
     if (!device) {
         print_string("[TTY] Failed to allocate device structure\n");
         return NULL;
@@ -140,10 +143,10 @@ tty_device_t *tty_alloc_device(tty_device_type_t type) {
     switch (type) {
     case TTY_DEVICE_GRAPHICS: {
         print_string("[TTY] Allocating graphics private data\n");
-        graphics_private_t *priv = (graphics_private_t *)kmalloc(sizeof(graphics_private_t));
+        graphics_private_t *priv = (graphics_private_t *)tty_kmalloc(sizeof(graphics_private_t));
         if (!priv) {
             print_string("[TTY] Failed to allocate graphics private data\n");
-            kfree(device);
+            tty_kfree(device);
             return NULL;
         }
         print_string("[TTY] Graphics private data allocated\n");
@@ -166,9 +169,9 @@ tty_device_t *tty_alloc_device(tty_device_type_t type) {
     }
     
     case TTY_DEVICE_SERIAL: {
-        serial_private_t *priv = (serial_private_t *)kmalloc(sizeof(serial_private_t));
+        serial_private_t *priv = (serial_private_t *)tty_kmalloc(sizeof(serial_private_t));
         if (!priv) {
-            kfree(device);
+            tty_kfree(device);
             return NULL;
         }
         

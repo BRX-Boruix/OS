@@ -45,6 +45,12 @@ void memory_init_x86_64(uint64_t info) {
     
     // 初始化内核堆 - 使用更安全的地址
     heap_current = 0x800000;  // 8MB处开始堆，避免与页表冲突
+    
+    // 检查地址是否可访问
+    if (heap_current < 0x1000000) {  // 确保在16MB以上
+        heap_current = 0x1000000;  // 使用16MB作为堆起始地址
+    }
+    
     heap_start = (heap_block_t*)heap_current;
     heap_start->size = 0x800000;  // 8MB堆空间
     heap_start->is_free = true;
