@@ -4,18 +4,14 @@
 #include "kernel/tty.h"
 #include "drivers/display.h"
 
-// TTY专用内存管理函数
-extern void* tty_kmalloc(size_t size);
-extern void tty_kfree(void* ptr);
-extern void tty_memory_init(void);
+// TTY专用内存管理函数现在在tty.h中定义为内联函数
 
 // 初始化TTY系统
 void tty_init(void) {
     print_string("[TTY] Starting TTY initialization...\n");
     
-    // 初始化TTY专用内存管理
-    tty_memory_init();
-    print_string("[TTY] TTY memory management initialized\n");
+    // TTY内存管理现在使用Rust内存管理器，无需单独初始化
+    print_string("[TTY] Using Rust memory manager\n");
     
     // 初始化内核日志系统
     klog_init();

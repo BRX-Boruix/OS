@@ -1,4 +1,4 @@
-// Boruix OS 主内核 - Limine + Framebuffer
+// Boruix OS 主内核 - Limine + Framebuffer + Rust内存管理
 
 #include "kernel/kernel.h"
 #include "drivers/display.h"
@@ -6,16 +6,7 @@
 #include "kernel/interrupt.h"
 #include "kernel/limine.h"
 #include "kernel/memory.h"
-#include "kernel/tty.h" // Added for TTY system
-
-// TTY内存管理函数声明
-extern void* tty_kmalloc(size_t size);
-extern void tty_kfree(void* ptr);
-extern void tty_memory_stats(size_t *total, size_t *used, size_t *free, size_t *peak);
-extern void* tty_kmalloc_large(size_t size);
-extern void tty_kfree_large(void* ptr);
-extern void* tty_map_page(uint64_t virtual_addr, uint64_t physical_addr, uint64_t flags);
-extern uint64_t tty_get_physical_addr(uint64_t virtual_addr);
+#include "kernel/tty.h"
 
 // Limine requests
 __attribute__((used, section(".requests")))
@@ -47,11 +38,8 @@ void kmain(void) {
     display_init(framebuffer_request.response->framebuffers[0]);
     clear_screen();
     
-    // 测试内存管理系统（不初始化，只测试函数可用性）
-    print_string("Testing memory management functions...\n");
-    
     // 显示欢迎信息（使用原有显示系统）
-    print_string("BORUIX OS x86_64\n");
+    print_string("BORUIX OS x86_64 - Rust Memory Manager\n");
     print_string("========================================\n");
     print_string("Limine Bootloader OK\n\n");
     
@@ -73,6 +61,11 @@ void kmain(void) {
     print_char(':');
     print_two_digits(second);
     print_string("\n\n");
+    
+    // TODO: Rust内存管理器需要完整实现
+    // 暂时禁用以避免系统崩溃
+    print_string("Note: Rust memory manager not yet fully implemented\n");
+    print_string("Using fallback memory allocation\n");
     
     // 初始化中断系统
     print_string("Initializing interrupt system...\n");
@@ -161,9 +154,41 @@ void kmain(void) {
     pic_clear_mask(1);  // Keyboard
     print_string("Keyboard IRQ enabled!\n");
     
-    // 在系统稳定后测试内存管理
-    print_string("Testing memory management...\n");
-    print_string("Memory management test completed\n");
+    // 测试Rust内存管理系统
+    print_string("Testing Rust memory management...\n");
+    
+    // 分配一些内存
+    void *ptr1 = kmalloc(1024);
+    void *ptr2 = kmalloc(2048);
+    void *ptr3 = kmalloc(512);
+    
+    if (ptr1 && ptr2 && ptr3) {
+        print_string("Memory allocation: SUCCESS\n");
+        
+        // 释放部分内存
+        kfree(ptr2);
+        print_string("Memory deallocation: SUCCESS\n");
+        
+        // 获取内存统计
+        size_t total, used, free, peak;
+        simple_memory_stats(&total, &used, &free, &peak);
+        print_string("Memory stats - Total: ");
+        print_dec((uint32_t)(total / 1024));
+        print_string(" KB, Used: ");
+        print_dec((uint32_t)(used / 1024));
+        print_string(" KB, Free: ");
+        print_dec((uint32_t)(free / 1024));
+        print_string(" KB\n");
+        
+        // 释放剩余内存
+        kfree(ptr1);
+        kfree(ptr3);
+        print_string("All memory freed: SUCCESS\n");
+    } else {
+        print_string("Memory allocation: FAILED\n");
+    }
+    
+    print_string("Rust memory management test completed\n");
     
     // 测试TTY系统
     print_string("Testing TTY system...\n");
@@ -178,41 +203,8 @@ void kmain(void) {
     kdebug("This is a debug message\n");
     print_string("TTY output test completed\n");
     
-    // 测试内存管理功能
-    print_string("Testing advanced memory management...\n");
-    
-    // 分配一些内存
-    void *ptr1 = tty_kmalloc(1024);
-    void *ptr2 = tty_kmalloc(2048);
-    void *ptr3 = tty_kmalloc(512);
-    
-    if (ptr1 && ptr2 && ptr3) {
-        print_string("Memory allocation: SUCCESS\n");
-        
-        // 释放部分内存
-        tty_kfree(ptr2);
-        print_string("Memory deallocation: SUCCESS\n");
-        
-        // 获取内存统计
-        size_t total, used, free, peak;
-        tty_memory_stats(&total, &used, &free, &peak);
-        kprintf("Memory stats - Total: %d KB, Used: %d KB, Free: %d KB, Peak: %d KB\n", 
-                total/1024, used/1024, free/1024, peak/1024);
-        
-        // 释放剩余内存
-        tty_kfree(ptr1);
-        tty_kfree(ptr3);
-        print_string("All memory freed: SUCCESS\n");
-    } else {
-        print_string("Memory allocation: FAILED\n");
-    }
-    
-    print_string("Advanced memory management test completed\n");
-    
-    // 测试页表管理和大内存（暂时禁用以避免系统崩溃）
-    print_string("Testing page table management and large memory...\n");
-    print_string("Large memory allocation: DISABLED (to prevent system crash)\n");
-    print_string("Page table and large memory test completed\n");
+    // 页面分配暂时不支持
+    print_string("Page allocation: Not yet implemented\n");
     
     print_string("========================================\n");
     print_string("Starting Shell...\n");

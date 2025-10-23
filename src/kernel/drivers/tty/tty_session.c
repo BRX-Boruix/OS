@@ -7,9 +7,7 @@
 #include "../flanterm/flanterm_backends/fb.h"
 #include "../../kernel/shell/utils/string.h"
 
-// TTY专用内存管理函数
-extern void* tty_kmalloc(size_t size);
-extern void tty_kfree(void* ptr);
+// TTY专用内存管理函数现在在tty.h中定义为内联函数
 
 // 全局内核TTY会话
 tty_session_t *kernel_tty_session = NULL;
