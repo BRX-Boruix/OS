@@ -59,9 +59,9 @@ extern void simple_free(void* ptr);
 static inline int memory_init_x86_64(uint64_t multiboot_info) {
     (void)multiboot_info;
     // 创建内存区域映射
-    // 使用位图分配器：从16MB开始，最多支持128MB（32768页）
+    // 使用懒加载伙伴分配器：支持大内存，快速初始化
     rust_memory_region_t regions[] = {
-        {0x1000000, 0x7000000, RUST_MEMORY_TYPE_AVAILABLE}, // 16MB-128MB (112MB可用)
+        {0x1000000, 0x3F000000, RUST_MEMORY_TYPE_AVAILABLE}, // 16MB-1008MB (992MB可用)
     };
     return rust_memory_init(regions, 1);
 }
@@ -118,14 +118,13 @@ void* memset(void* dest, int value, size_t count);
 void* memcpy(void* dest, const void* src, size_t count);
 int memcmp(const void* ptr1, const void* ptr2, size_t count);
 
-// 页面分配函数（暂时不支持）
+// 页面分配函数（使用Rust分配器）
 static inline uint64_t alloc_page(void) {
-    return 0;  // 暂时不支持
+    return rust_alloc_page();
 }
 
 static inline void free_page(uint64_t page_addr) {
-    (void)page_addr;
-    // 暂时不支持
+    rust_free_page(page_addr);
 }
 
 // 内存统计函数（简单实现）
