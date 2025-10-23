@@ -36,7 +36,7 @@ void kmain(void) {
     display_init(framebuffer_request.response->framebuffers[0]);
     clear_screen();
     
-    // 显示欢迎信息
+    // 显示欢迎信息（使用原有显示系统）
     print_string("BORUIX OS x86_64\n");
     print_string("========================================\n");
     print_string("Limine Bootloader OK\n\n");
@@ -45,7 +45,7 @@ void kmain(void) {
     struct limine_framebuffer *fb = framebuffer_request.response->framebuffers[0];
     print_string("Resolution: ");
     print_dec(fb->width);
-    print_char('x');
+    print_string("x");
     print_dec(fb->height);
     print_string("\n\n");
     
@@ -63,7 +63,7 @@ void kmain(void) {
     // 初始化中断系统
     print_string("Initializing interrupt system...\n");
     interrupt_init();
-    print_string("Interrupt system ready!\n\n");
+    print_string("Interrupt system ready!\n");
     
     print_string("========================================\n");
     print_string("SYSTEM READY\n");
@@ -84,14 +84,13 @@ void kmain(void) {
         } while (sec_current == sec_start);
         
         if (i < 2) {
-            print_char('\r');
-            print_string("Loading");
+            print_string("\rLoading");
         }
     }
     print_string(" Done!\n\n");
     
     // 调试：检查当前CS寄存器
-    print_string("Debug: Checking current CS register...\n");
+    print_string("Checking current CS register...\n");
     uint16_t cs;
     __asm__ volatile("mov %%cs, %0" : "=r"(cs));
     print_string("CS = 0x");
@@ -112,14 +111,14 @@ void kmain(void) {
     print_string("\n");
     
     // CS已确认为0x28，IDT已修复，现在测试Timer中断
-    print_string("CS confirmed = 0x28, IDT selector fixed!\n\n");
+    print_string("CS confirmed = 0x28, IDT selector fixed!\n");
     
     print_string("Enabling Timer IRQ...\n");
     extern void pic_clear_mask(uint8_t irq);
     pic_clear_mask(0);  // Timer
     
     __asm__ volatile("sti");
-    print_string("Interrupts ENABLED!\n\n");
+    print_string("Interrupts ENABLED!\n");
     
     print_string("Waiting 3 seconds...\n");
     unsigned char sec_start = read_cmos(0x00);
@@ -140,13 +139,13 @@ void kmain(void) {
     if (get_interrupt_count(32) > 0) {
         print_string("\nSUCCESS! Timer interrupt is WORKING!\n\n");
     } else {
-        print_string("\nFAILED: Timer still not working\n\n");
+        print_string("FAILED: Timer still not working\n");
     }
     
     // 启用键盘中断
     print_string("Enabling keyboard interrupt...\n");
     pic_clear_mask(1);  // Keyboard
-    print_string("Keyboard IRQ enabled!\n\n");
+    print_string("Keyboard IRQ enabled!\n");
     
     print_string("========================================\n");
     print_string("Starting Shell...\n");

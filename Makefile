@@ -44,6 +44,7 @@ KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/framebuffer/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/flanterm/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/flanterm/flanterm_backends/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/drivers/tty/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/lib/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/memory/memory_common.c)
 
