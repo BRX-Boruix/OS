@@ -27,6 +27,17 @@ void idt_set_gate(uint8_t num, uint64_t handler) {
     idt[num].reserved = 0;
 }
 
+// 设置IDT门（带IST支持）
+void idt_set_gate_with_ist(uint8_t num, uint64_t handler, uint8_t ist) {
+    idt[num].offset_low = (uint16_t)(handler & 0xFFFF);
+    idt[num].offset_mid = (uint16_t)((handler >> 16) & 0xFFFF);
+    idt[num].offset_high = (uint32_t)((handler >> 32) & 0xFFFFFFFF);
+    idt[num].selector = 0x28;
+    idt[num].ist = ist;  // 使用IST（1-7）
+    idt[num].type = IDT_INTERRUPT_GATE;
+    idt[num].reserved = 0;
+}
+
 void idt_init(void) {
     idt_ptr.limit = sizeof(idt) - 1;
     idt_ptr.base = (uint64_t)&idt;
@@ -49,7 +60,7 @@ void idt_init(void) {
     idt_set_gate(5, (uint64_t)isr5);
     idt_set_gate(6, (uint64_t)isr6);
     idt_set_gate(7, (uint64_t)isr7);
-    idt_set_gate(8, (uint64_t)isr8);
+    idt_set_gate_with_ist(8, (uint64_t)isr8, 1);  // 双重错误使用IST1
     idt_set_gate(9, (uint64_t)isr9);
     idt_set_gate(10, (uint64_t)isr10);
     idt_set_gate(11, (uint64_t)isr11);
