@@ -54,13 +54,15 @@ KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/lib/*.c) \
 
 # 架构特定的C源文件（明确指定子目录避免通配符问题）
-KERNEL_ARCH_SRCS = $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupt/*.c)
+KERNEL_ARCH_SRCS = $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/*.c) \
+                   $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupt/*.c)
 
-# 合并所有C源文件
-KERNEL_SRCS = $(KERNEL_COMMON_SRCS) $(KERNEL_ARCH_SRCS)
+# 合并所有C源文件（去重）
+KERNEL_SRCS = $(sort $(KERNEL_COMMON_SRCS) $(KERNEL_ARCH_SRCS))
 
 # 自动发现架构特定的汇编文件
-KERNEL_ASM_SRCS := $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/*.asm) \
+KERNEL_ASM_SRCS := $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/*.asm) \
+                   $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/*.asm) \
                    $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupt/*.asm)
 
 # 自动发现所有Rust项目（查找包含Cargo.toml的目录）
