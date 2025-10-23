@@ -8,6 +8,11 @@
 #include "kernel/memory.h"
 #include "kernel/tty.h" // Added for TTY system
 
+// TTY内存管理函数声明
+extern void* tty_kmalloc(size_t size);
+extern void tty_kfree(void* ptr);
+extern void tty_memory_stats(size_t *total, size_t *used, size_t *free, size_t *peak);
+
 // Limine requests
 __attribute__((used, section(".requests")))
 static volatile LIMINE_BASE_REVISION(2);
@@ -168,6 +173,37 @@ void kmain(void) {
     kinfo("This is an info message\n");
     kdebug("This is a debug message\n");
     print_string("TTY output test completed\n");
+    
+    // 测试内存管理功能
+    print_string("Testing advanced memory management...\n");
+    
+    // 分配一些内存
+    void *ptr1 = tty_kmalloc(1024);
+    void *ptr2 = tty_kmalloc(2048);
+    void *ptr3 = tty_kmalloc(512);
+    
+    if (ptr1 && ptr2 && ptr3) {
+        print_string("Memory allocation: SUCCESS\n");
+        
+        // 释放部分内存
+        tty_kfree(ptr2);
+        print_string("Memory deallocation: SUCCESS\n");
+        
+        // 获取内存统计
+        size_t total, used, free, peak;
+        tty_memory_stats(&total, &used, &free, &peak);
+        kprintf("Memory stats - Total: %d KB, Used: %d KB, Free: %d KB, Peak: %d KB\n", 
+                total/1024, used/1024, free/1024, peak/1024);
+        
+        // 释放剩余内存
+        tty_kfree(ptr1);
+        tty_kfree(ptr3);
+        print_string("All memory freed: SUCCESS\n");
+    } else {
+        print_string("Memory allocation: FAILED\n");
+    }
+    
+    print_string("Advanced memory management test completed\n");
     
     print_string("========================================\n");
     print_string("Starting Shell...\n");
