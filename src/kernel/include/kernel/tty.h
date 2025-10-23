@@ -127,4 +127,13 @@ int tty_switch_device(const char *device_name);
 const char *tty_get_current_device_name(void);
 void tty_list_devices(void);
 
+// TTY内存管理函数
+extern void* tty_kmalloc(size_t size);
+extern void tty_kfree(void* ptr);
+extern void tty_memory_stats(size_t *total, size_t *used, size_t *free, size_t *peak);
+extern void* tty_kmalloc_large(size_t size);
+extern void tty_kfree_large(void* ptr);
+extern void* tty_map_page(uint64_t virtual_addr, uint64_t physical_addr, uint64_t flags);
+extern uint64_t tty_get_physical_addr(uint64_t virtual_addr);
+
 #endif // BORUIX_TTY_H
