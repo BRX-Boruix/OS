@@ -1,0 +1,21 @@
+[package]
+name = "boruix_memory"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "boruix_memory"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+# 无标准库依赖，纯系统编程
+
+[profile.release]
+panic = "abort"
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[profile.dev]
+panic = "abort"
+opt-level = 1

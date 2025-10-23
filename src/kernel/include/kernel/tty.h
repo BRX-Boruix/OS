@@ -1,10 +1,12 @@
 // Boruix OS TTY系统头文件
 // 参考CoolPotOS实现的现代TTY架构
+// 使用Rust内存管理器
 
 #ifndef BORUIX_TTY_H
 #define BORUIX_TTY_H
 
 #include "kernel/types.h"
+#include "rust/rust_memory.h"
 #include "stdarg.h"
 
 // TTY设备类型
@@ -127,7 +129,7 @@ int tty_switch_device(const char *device_name);
 const char *tty_get_current_device_name(void);
 void tty_list_devices(void);
 
-// TTY内存管理函数
+// TTY内存管理函数（映射到Rust内存管理器）
 extern void* tty_kmalloc(size_t size);
 extern void tty_kfree(void* ptr);
 extern void tty_memory_stats(size_t *total, size_t *used, size_t *free, size_t *peak);
