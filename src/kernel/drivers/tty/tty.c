@@ -3,11 +3,19 @@
 
 #include "kernel/tty.h"
 #include "drivers/display.h"
-#include "kernel/memory.h"
+
+// TTY专用内存管理函数
+extern void* tty_kmalloc(size_t size);
+extern void tty_kfree(void* ptr);
+extern void tty_memory_init(void);
 
 // 初始化TTY系统
 void tty_init(void) {
     print_string("[TTY] Starting TTY initialization...\n");
+    
+    // 初始化TTY专用内存管理
+    tty_memory_init();
+    print_string("[TTY] TTY memory management initialized\n");
     
     // 初始化内核日志系统
     klog_init();
@@ -137,9 +145,9 @@ void tty_cleanup(void) {
         tty_device_t *next = current->next;
         tty_unregister_device(current);
         if (current->private_data) {
-            kfree(current->private_data);
+            tty_kfree(current->private_data);
         }
-        kfree(current);
+        tty_kfree(current);
         current = next;
     }
 }

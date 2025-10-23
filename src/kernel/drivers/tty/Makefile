@@ -6,7 +6,7 @@ CFLAGS = -Wall -Wextra -std=c99 -ffreestanding -fno-stack-protector -fno-stack-c
 INCLUDES = -I../../include -I../flanterm -I../flanterm/flanterm_backends
 
 # 源文件（完整TTY实现）
-SOURCES = tty.c tty_device.c tty_session.c tty_klog.c
+SOURCES = tty.c tty_device.c tty_session.c tty_klog.c tty_memory.c
 OBJECTS = $(SOURCES:.c=.o)
 
 # 目标文件

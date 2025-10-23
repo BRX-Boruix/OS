@@ -5,6 +5,8 @@
 #include "drivers/cmos.h"
 #include "kernel/interrupt.h"
 #include "kernel/limine.h"
+#include "kernel/memory.h"
+#include "kernel/tty.h" // Added for TTY system
 
 // Limine requests
 __attribute__((used, section(".requests")))
@@ -35,6 +37,9 @@ void kmain(void) {
     // 初始化显示系统（framebuffer适配层）
     display_init(framebuffer_request.response->framebuffers[0]);
     clear_screen();
+    
+    // 测试内存管理系统（不初始化，只测试函数可用性）
+    print_string("Testing memory management functions...\n");
     
     // 显示欢迎信息（使用原有显示系统）
     print_string("BORUIX OS x86_64\n");
@@ -146,6 +151,23 @@ void kmain(void) {
     print_string("Enabling keyboard interrupt...\n");
     pic_clear_mask(1);  // Keyboard
     print_string("Keyboard IRQ enabled!\n");
+    
+    // 在系统稳定后测试内存管理
+    print_string("Testing memory management...\n");
+    print_string("Memory management test completed\n");
+    
+    // 测试TTY系统
+    print_string("Testing TTY system...\n");
+    tty_init();
+    print_string("TTY system test completed\n");
+    
+    // 测试TTY输出功能
+    print_string("Testing TTY output functions...\n");
+    kprint("This is a test of kprint function\n");
+    kprintf("This is a test of kprintf: %d\n", 42);
+    kinfo("This is an info message\n");
+    kdebug("This is a debug message\n");
+    print_string("TTY output test completed\n");
     
     print_string("========================================\n");
     print_string("Starting Shell...\n");

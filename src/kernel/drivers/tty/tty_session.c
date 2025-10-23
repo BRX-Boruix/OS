@@ -5,8 +5,11 @@
 #include "drivers/display.h"
 #include "../flanterm/flanterm.h"
 #include "../flanterm/flanterm_backends/fb.h"
-#include "kernel/memory.h"
 #include "../../kernel/shell/utils/string.h"
+
+// TTY专用内存管理函数
+extern void* tty_kmalloc(size_t size);
+extern void tty_kfree(void* ptr);
 
 // 全局内核TTY会话
 tty_session_t *kernel_tty_session = NULL;
@@ -48,7 +51,7 @@ static int session_ioctl(void *session, uint32_t cmd, uint32_t arg) {
 tty_session_t *tty_create_session(tty_device_t *device) {
     if (!device) return NULL;
     
-    tty_session_t *session = (tty_session_t *)kmalloc(sizeof(tty_session_t));
+    tty_session_t *session = (tty_session_t *)tty_kmalloc(sizeof(tty_session_t));
     if (!session) return NULL;
     
     // 初始化会话结构
@@ -78,14 +81,14 @@ int tty_destroy_session(tty_session_t *session) {
     
     // 清理会话资源
     if (session->name) {
-        kfree(session->name);
+        tty_kfree(session->name);
     }
     
     // 注意：不销毁设备，设备由设备管理器管理
     session->device = NULL;
     session->terminal = NULL;
     
-    kfree(session);
+    tty_kfree(session);
     return 0;
 }
 
@@ -129,7 +132,7 @@ void tty_init_kernel_session(void) {
     // 创建内核会话
     kernel_tty_session = tty_create_session(default_device);
     if (kernel_tty_session) {
-        kernel_tty_session->name = (char *)kmalloc(16);
+        kernel_tty_session->name = (char *)tty_kmalloc(16);
         if (kernel_tty_session->name) {
             shell_strcpy(kernel_tty_session->name, "kernel");
         }
@@ -146,10 +149,10 @@ int tty_set_session_name(tty_session_t *session, const char *name) {
     if (!session || !name) return -1;
     
     if (session->name) {
-        kfree(session->name);
+        tty_kfree(session->name);
     }
     
-    session->name = (char *)kmalloc(shell_strlen(name) + 1);
+    session->name = (char *)tty_kmalloc(shell_strlen(name) + 1);
     if (session->name) {
         shell_strcpy(session->name, name);
         return 0;
