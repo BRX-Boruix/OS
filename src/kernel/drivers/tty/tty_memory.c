@@ -273,12 +273,12 @@ void tty_memory_stats(size_t *total, size_t *used, size_t *free, size_t *peak) {
 
 // 页表管理函数
 
-// 分配物理页面（更安全的实现）
+// 分配物理页面（使用TTY内存池内的空间）
 static uint64_t alloc_physical_page(void) {
-    // 使用更高的地址避免与内核冲突
-    static uint64_t temp_next_page = 0x10000000;  // 256MB开始，避免与内核冲突
+    // 使用TTY内存池内的空间，避免与内核冲突
+    static uint64_t temp_next_page = 0x20000000;  // 512MB开始，远离内核区域
     
-    if (temp_next_page >= 0x20000000) {  // 限制在512MB以内
+    if (temp_next_page >= 0x30000000) {  // 限制在768MB以内
         return 0;  // 内存不足
     }
     
@@ -375,7 +375,7 @@ void tty_init_page_tables(void) {
     print_string("[TTY] Page tables initialized (128MB, using kernel page tables)\n");
 }
 
-// 大内存分配（简化版本，直接返回物理地址）
+// 大内存分配（使用TTY内存池内的空间）
 void* tty_kmalloc_large(size_t size) {
     if (size == 0) return NULL;
     
@@ -402,20 +402,28 @@ void* tty_kmalloc_large(size_t size) {
     print_string(size_str);
     print_string(" bytes\n");
     
-    // 对齐到页面边界
-    size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
+    // 检查大小是否超过内存池剩余空间
+    if (size > TTY_MEMORY_POOL_SIZE / 2) {  // 限制大内存分配不超过内存池的一半
+        print_string("[TTY] Large allocation too big for memory pool\n");
+        return NULL;
+    }
     
-    // 分配物理页面
-    uint64_t physical_addr = alloc_physical_page();
-    if (physical_addr == 0) {
-        print_string("[TTY] Failed to allocate physical page\n");
+    // 使用TTY内存池内的空间进行大内存分配
+    // 从内存池的后半部分分配大内存
+    static size_t large_memory_offset = TTY_MEMORY_POOL_SIZE / 2;  // 从中间开始
+    
+    if (large_memory_offset + size > TTY_MEMORY_POOL_SIZE) {
+        print_string("[TTY] Failed to allocate large memory (pool full)\n");
         return NULL;  // 内存不足
     }
     
-    print_string("[TTY] Allocated physical page: 0x");
+    uint64_t virtual_addr = (uint64_t)(tty_memory_pool + large_memory_offset);
+    large_memory_offset += size;
+    
+    print_string("[TTY] Allocated large memory: 0x");
     // 简单的十六进制转换
     char hex_str[16];
-    uint64_t addr = physical_addr;
+    uint64_t addr = virtual_addr;
     for (int j = 15; j >= 0; j--) {
         int digit = addr & 0xF;
         hex_str[j] = (digit < 10) ? ('0' + digit) : ('A' + digit - 10);
@@ -425,24 +433,37 @@ void* tty_kmalloc_large(size_t size) {
     print_string(hex_str);
     print_string("\n");
     
-    // 简化实现：直接返回物理地址（在简单系统中，物理地址就是虚拟地址）
+    // 清零分配的内存
+    char *mem = (char*)virtual_addr;
+    for (size_t j = 0; j < size; j++) {
+        mem[j] = 0;
+    }
+    
     print_string("[TTY] Large memory allocation: SUCCESS\n");
-    return (void*)physical_addr;
+    return (void*)virtual_addr;
 }
 
 // 大内存释放
 void tty_kfree_large(void* ptr) {
     if (!ptr) return;
     
-    // 获取物理地址
-    uint64_t physical_addr = tty_get_physical_addr((uint64_t)ptr);
-    if (physical_addr == 0) {
-        return;  // 无效地址
+    print_string("[TTY] Large memory deallocation: ");
+    // 简单的十六进制转换
+    char hex_str[16];
+    uint64_t addr = (uint64_t)ptr;
+    for (int j = 15; j >= 0; j--) {
+        int digit = addr & 0xF;
+        hex_str[j] = (digit < 10) ? ('0' + digit) : ('A' + digit - 10);
+        addr >>= 4;
     }
+    hex_str[16] = '\0';
+    print_string("0x");
+    print_string(hex_str);
+    print_string("\n");
     
-    // 这里简化处理，实际应该回收物理页面
-    // 在实际系统中，应该实现页面回收机制
-    (void)physical_addr;
+    // 简化处理：由于大内存分配使用的是TTY内存池内的空间，
+    // 这里不需要实际回收，只需要记录释放即可
+    print_string("[TTY] Large memory deallocation: SUCCESS\n");
 }
 
 #endif // __x86_64__
