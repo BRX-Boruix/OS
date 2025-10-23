@@ -7,6 +7,7 @@
 #include "kernel/limine.h"
 #include "kernel/memory.h"
 #include "kernel/tty.h"
+#include "kernel/serial_debug.h"
 
 // Limine requests
 __attribute__((used, section(".requests")))
@@ -15,6 +16,12 @@ static volatile LIMINE_BASE_REVISION(2);
 __attribute__((used, section(".requests")))
 static volatile struct limine_framebuffer_request framebuffer_request = {
     .id = LIMINE_FRAMEBUFFER_REQUEST,
+    .revision = 0
+};
+
+__attribute__((used, section(".requests")))
+static volatile struct limine_hhdm_request hhdm_request = {
+    .id = LIMINE_HHDM_REQUEST,
     .revision = 0
 };
 
@@ -29,12 +36,33 @@ static void hcf(void) {
 }
 
 void kmain(void) {
+    // 初始化串口调试（第一件事）
+    serial_debug_init();
+    SERIAL_INFO("=== Boruix OS Boot Starting ===");
+    
     // 检查Limine
-    if (LIMINE_BASE_REVISION_SUPPORTED == false) hcf();
+    SERIAL_DEBUG("Checking Limine base revision...");
+    if (LIMINE_BASE_REVISION_SUPPORTED == false) {
+        SERIAL_ERROR("Limine base revision not supported!");
+        hcf();
+    }
+    
+    SERIAL_DEBUG("Checking framebuffer...");
     if (framebuffer_request.response == NULL || 
-        framebuffer_request.response->framebuffer_count < 1) hcf();
+        framebuffer_request.response->framebuffer_count < 1) {
+        SERIAL_ERROR("No framebuffer available!");
+        hcf();
+    }
+    
+    SERIAL_DEBUG("Checking HHDM...");
+    if (hhdm_request.response == NULL) {
+        SERIAL_ERROR("HHDM request failed!");
+        hcf();
+    }
+    SERIAL_INFO("Limine checks passed");
     
     // 初始化显示系统（framebuffer适配层）
+    SERIAL_DEBUG("Initializing display system...");
     display_init(framebuffer_request.response->framebuffers[0]);
     clear_screen();
     
@@ -62,10 +90,34 @@ void kmain(void) {
     print_two_digits(second);
     print_string("\n\n");
     
-    // TODO: Rust内存管理器需要完整实现
-    // 暂时禁用以避免系统崩溃
-    print_string("Note: Rust memory manager not yet fully implemented\n");
-    print_string("Using fallback memory allocation\n");
+    // 显示HHDM信息
+    print_string("HHDM Offset: 0x");
+    print_hex(hhdm_request.response->offset);
+    print_string("\n\n");
+    
+    serial_puts("[INFO] HHDM Offset: ");
+    serial_put_hex(hhdm_request.response->offset);
+    serial_puts("\n");
+    
+    // 初始化Rust内存管理器（阶段2：物理分配器）
+    print_string("Initializing Rust memory manager (Stage 2)...\n");
+    SERIAL_INFO("Setting HHDM offset...");
+    rust_set_hhdm_offset(hhdm_request.response->offset);
+    
+    SERIAL_INFO("Calling memory_init()...");
+    int memory_result = memory_init(0);
+    
+    serial_puts("[INFO] memory_init() returned: ");
+    serial_put_dec(memory_result);
+    serial_puts("\n");
+    
+    if (memory_result == 0) {
+        print_string("Rust memory manager initialized successfully!\n");
+        SERIAL_INFO("Rust memory manager initialized successfully!");
+    } else {
+        print_string("Failed to initialize Rust memory manager\n");
+        SERIAL_ERROR("Failed to initialize Rust memory manager!");
+    }
     
     // 初始化中断系统
     print_string("Initializing interrupt system...\n");
@@ -203,8 +255,27 @@ void kmain(void) {
     kdebug("This is a debug message\n");
     print_string("TTY output test completed\n");
     
-    // 页面分配暂时不支持
-    print_string("Page allocation: Not yet implemented\n");
+    // 测试页面分配（阶段2）
+    print_string("Testing page allocation...\n");
+    uint64_t page1 = alloc_page();
+    uint64_t page2 = alloc_page();
+    
+    if (page1 && page2) {
+        print_string("Page allocation: SUCCESS\n");
+        print_string("Page 1: 0x");
+        print_hex(page1);
+        print_string("\nPage 2: 0x");
+        print_hex(page2);
+        print_string("\n");
+        
+        free_page(page1);
+        free_page(page2);
+        print_string("Page deallocation: SUCCESS\n");
+    } else {
+        print_string("Page allocation: FAILED\n");
+        if (!page1) print_string("  Page 1 returned 0\n");
+        if (!page2) print_string("  Page 2 returned 0\n");
+    }
     
     print_string("========================================\n");
     print_string("Starting Shell...\n");

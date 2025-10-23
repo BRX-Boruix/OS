@@ -51,15 +51,19 @@ typedef rust_memory_region_t memory_region_t;
 #define KERNEL_HEAP_START     0xFFFFFFFF90000000ULL
 #define KERNEL_HEAP_END       0xFFFFFFFFA0000000ULL
 
-// 简单分配器函数（临时）
+// 简单分配器函数（备用）
 extern void* simple_malloc(size_t size);
 extern void simple_free(void* ptr);
 
-// 内存管理函数（暂时使用简单分配器）
+// 内存管理函数（使用Rust内存管理器）
 static inline int memory_init_x86_64(uint64_t multiboot_info) {
     (void)multiboot_info;
-    // 简单分配器不需要初始化
-    return 0;
+    // 创建内存区域映射
+    // 使用位图分配器：从16MB开始，最多支持128MB（32768页）
+    rust_memory_region_t regions[] = {
+        {0x1000000, 0x7000000, RUST_MEMORY_TYPE_AVAILABLE}, // 16MB-128MB (112MB可用)
+    };
+    return rust_memory_init(regions, 1);
 }
 
 static inline void* kmalloc_x86_64(size_t size) {

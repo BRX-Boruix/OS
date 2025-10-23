@@ -3,6 +3,7 @@
 
 use crate::arch::addr::PhysAddr;
 use crate::arch::{MemoryRegion, PAGE_SIZE};
+use crate::hhdm;
 use core::ptr::NonNull;
 
 /// 物理页面帧
@@ -79,6 +80,11 @@ impl PhysicalAllocator {
             return Err("Physical allocator already initialized");
         }
 
+        // 检查内存映射
+        if memory_map.is_empty() {
+            return Err("No memory regions provided");
+        }
+
         // 复制内存区域信息
         if memory_map.len() > self.memory_regions.len() {
             return Err("Too many memory regions");
@@ -92,6 +98,11 @@ impl PhysicalAllocator {
         // 初始化空闲页面链表
         self.init_free_list()?;
 
+        // 检查是否有可用页面
+        if self.total_pages == 0 {
+            return Err("No available pages after initialization");
+        }
+
         self.initialized = true;
         Ok(())
     }
@@ -100,6 +111,11 @@ impl PhysicalAllocator {
     fn init_free_list(&mut self) -> Result<(), &'static str> {
         self.free_list = None;
         self.total_pages = 0;
+
+        // 检查HHDM是否已初始化
+        if !hhdm::is_initialized() {
+            return Err("HHDM not initialized");
+        }
 
         // 遍历所有可用内存区域
         for i in 0..self.region_count {
@@ -152,7 +168,9 @@ impl PhysicalAllocator {
 
     /// 将单个页面添加到空闲链表
     fn add_page_to_free_list(&mut self, addr: PhysAddr) {
-        let node_ptr = addr.as_u64() as *mut FreePageNode;
+        // 通过HHDM将物理地址转换为虚拟地址
+        let virt_addr = hhdm::phys_to_virt(addr);
+        let node_ptr = virt_addr.as_u64() as *mut FreePageNode;
 
         unsafe {
             let node = &mut *node_ptr;
@@ -172,7 +190,10 @@ impl PhysicalAllocator {
                 let node = node_ptr.as_ref();
                 self.free_list = node.next;
 
-                let frame_addr = PhysAddr::new(node_ptr.as_ptr() as u64);
+                // node_ptr是虚拟地址，需要转换回物理地址
+                let virt_addr = crate::arch::addr::VirtAddr::new(node_ptr.as_ptr() as u64);
+                let frame_addr = hhdm::virt_to_phys(virt_addr)
+                    .expect("Failed to convert virtual address to physical");
                 self.allocated_pages += 1;
 
                 // 清零页面内容
@@ -229,7 +250,9 @@ impl PhysicalAllocator {
 
     /// 清零页面内容
     fn zero_page(&self, addr: PhysAddr) {
-        let page_ptr = addr.as_u64() as *mut u8;
+        // 通过HHDM将物理地址转换为虚拟地址
+        let virt_addr = hhdm::phys_to_virt(addr);
+        let page_ptr = virt_addr.as_u64() as *mut u8;
         unsafe {
             for i in 0..PAGE_SIZE {
                 *page_ptr.add(i) = 0;

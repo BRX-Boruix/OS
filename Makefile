@@ -40,6 +40,7 @@ LIMINE_DIR = limine
 
 # 自动发现所有C源文件
 KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/kernel/debug/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/kernel/shell/**/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/kernel/shell/**/**/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/cmos/*.c) \
@@ -170,7 +171,7 @@ distclean: clean-all
 
 # 运行虚拟机
 run: $(ISO)
-	$(QEMU) -cdrom $(ISO) -boot d
+	$(QEMU) -cdrom $(ISO) -boot d -serial stdio -no-reboot -d cpu_reset
 
 # 安装Limine（如果需要）
 install-limine:
