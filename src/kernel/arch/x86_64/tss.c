@@ -36,8 +36,6 @@ typedef struct {
 
 // 外部汇编函数
 extern void tss_load(uint16_t selector);
-extern uint64_t get_gdt_base(void);
-extern uint16_t get_gdt_limit(void);
 
 // 初始化TSS
 void tss_init(void) {
@@ -57,20 +55,10 @@ void tss_init(void) {
     // 设置IOMAP基址（指向TSS末尾，表示没有I/O权限位图）
     tss.iomap_base = sizeof(tss_t);
     
-    // 注意：Limine已经设置好了GDT和TSS
-    // x86_64模式下，TSS主要用于IST（中断栈表）
-    // CPU会自动使用当前TSS中的IST条目
-    // 我们不需要手动加载TSS，Limine已经加载了
-    // 只需要修改当前TSS的IST字段即可
-    
-    // TODO: 在实际实现中，我们应该：
-    // 1. 找到Limine设置的TSS地址
-    // 2. 修改其IST[0]字段
-    // 3. 或者创建自己的GDT和TSS
-    
-    // 暂时的解决方案：打印调试信息
-    (void)get_gdt_base;  // 避免未使用警告
-    (void)tss_load;      // 避免未使用警告
+    // 注意：TSS将由GDT模块加载
+    // 这里只需要初始化TSS结构体
+    // gdt_init()会调用tss_get_base()获取TSS地址并设置到GDT中
+    (void)tss_load;  // 避免未使用警告（tss_load由gdt_init调用）
     
     print_string("[TSS] Task State Segment initialized\n");
     print_string("[TSS] Double Fault Stack at: 0x");
