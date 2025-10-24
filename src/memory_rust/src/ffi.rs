@@ -106,17 +106,78 @@ pub extern "C" fn rust_memory_init(
 }
 
 /// 分配内存
-/// 阶段2: 仍返回NULL，使用fallback
+/// 阶段2E: 完整实现，使用堆分配器
 #[no_mangle]
-pub extern "C" fn rust_kmalloc(_size: usize) -> *mut u8 {
-    ptr::null_mut()
+pub extern "C" fn rust_kmalloc(size: usize) -> *mut u8 {
+    if size == 0 {
+        return ptr::null_mut();
+    }
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return ptr::null_mut();
+        }
+    };
+
+    // 获取所有需要的组件
+    let (heap, vmm, page_table) = match (
+        &mut manager.heap_allocator,
+        &mut manager.vmm,
+        &mut manager.page_table_manager,
+    ) {
+        (Some(h), Some(v), Some(pt)) => (h, v, pt),
+        _ => {
+            serial_log!("ERROR: Heap/VMM/PageTable not initialized");
+            return ptr::null_mut();
+        }
+    };
+
+    // 分配物理页面的闭包
+    let alloc_frame = || manager.physical_allocator.allocate_frame();
+
+    // 执行分配
+    match heap.allocate(size, vmm, page_table, alloc_frame) {
+        Ok(ptr) => ptr,
+        Err(_e) => {
+            serial_log!("ERROR: Failed to allocate heap memory");
+            ptr::null_mut()
+        }
+    }
 }
 
 /// 释放内存
-/// 阶段2: 空操作
+/// 阶段2E: 完整实现，使用堆分配器
 #[no_mangle]
-pub extern "C" fn rust_kfree(_ptr: *mut u8) {
-    // 什么都不做
+pub extern "C" fn rust_kfree(ptr_arg: *mut u8) {
+    if ptr_arg.is_null() {
+        return;
+    }
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return;
+        }
+    };
+
+    // 获取堆分配器
+    let heap = match &mut manager.heap_allocator {
+        Some(h) => h,
+        None => {
+            serial_log!("ERROR: Heap allocator not initialized");
+            return;
+        }
+    };
+
+    // 执行释放
+    if let Err(_e) = heap.deallocate(ptr_arg) {
+        serial_log!("ERROR: Failed to free heap memory");
+    }
 }
 
 /// 分配物理页面
@@ -498,5 +559,59 @@ pub extern "C" fn rust_vmm_get_heap_usage(used: *mut u64, total: *mut u64) {
     unsafe {
         *used = used_bytes;
         *total = total_bytes;
+    }
+}
+
+/// 获取堆统计信息
+#[no_mangle]
+pub extern "C" fn rust_heap_stats(
+    total_alloc: *mut usize,
+    total_freed: *mut usize,
+    current: *mut usize,
+    alloc_count: *mut usize,
+    free_count: *mut usize,
+) {
+    if total_alloc.is_null() || total_freed.is_null() || current.is_null() 
+        || alloc_count.is_null() || free_count.is_null() {
+        return;
+    }
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_ref() } {
+        Some(m) => m,
+        None => {
+            unsafe {
+                *total_alloc = 0;
+                *total_freed = 0;
+                *current = 0;
+                *alloc_count = 0;
+                *free_count = 0;
+            }
+            return;
+        }
+    };
+
+    // 获取堆分配器
+    let heap = match manager.heap_allocator.as_ref() {
+        Some(h) => h,
+        None => {
+            unsafe {
+                *total_alloc = 0;
+                *total_freed = 0;
+                *current = 0;
+                *alloc_count = 0;
+                *free_count = 0;
+            }
+            return;
+        }
+    };
+
+    let stats = heap.stats();
+    unsafe {
+        *total_alloc = stats.total_allocated;
+        *total_freed = stats.total_freed;
+        *current = stats.current_usage;
+        *alloc_count = stats.allocation_count;
+        *free_count = stats.free_count;
     }
 }

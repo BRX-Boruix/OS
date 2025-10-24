@@ -12,39 +12,43 @@ pub mod hhdm;  // HHDM支持
 pub mod lazy_buddy;  // 懒加载伙伴分配器
 pub mod paging;  // 分页管理
 pub mod vmm;  // 虚拟内存管理
+pub mod heap;  // 堆分配器
 pub mod stats;
 
 // 导出主要接口
 pub use stats::*;
 pub use paging::*;
 pub use vmm::*;
+pub use heap::*;
 
 /// 全局内存管理器实例
 static mut MEMORY_MANAGER: Option<MemoryManager> = None;
 
 /// 内存管理器主结构
-/// 阶段2D: 添加虚拟内存管理
+/// 阶段2E: 添加堆分配器
 pub struct MemoryManager {
     physical_allocator: lazy_buddy::LazyBuddyAllocator,
     page_table_manager: Option<paging::PageTableManager>,
     vmm: Option<vmm::VirtualMemoryManager>,
+    heap_allocator: Option<heap::HeapAllocator>,
     stats: stats::MemoryStats,
 }
 
 impl MemoryManager {
     /// 创建新的内存管理器
-    /// 阶段2D: 添加虚拟内存管理
+    /// 阶段2E: 添加堆分配器
     pub const fn new() -> Self {
         Self {
             physical_allocator: lazy_buddy::LazyBuddyAllocator::new(),
             page_table_manager: None,
             vmm: None,
+            heap_allocator: None,
             stats: stats::MemoryStats::new(),
         }
     }
 
     /// 初始化内存管理器
-    /// 阶段2D: 初始化物理分配器、页表管理器和VMM
+    /// 阶段2E: 初始化物理分配器、页表管理器、VMM和堆分配器
     pub fn init(&mut self, memory_map: &[arch::MemoryRegion]) -> Result<(), &'static str> {
         // 初始化物理内存分配器
         self.physical_allocator.init(memory_map)?;
@@ -56,6 +60,11 @@ impl MemoryManager {
         let mut vmm = vmm::VirtualMemoryManager::new();
         vmm.init()?;
         self.vmm = Some(vmm);
+
+        // 初始化堆分配器
+        let mut heap = heap::HeapAllocator::new();
+        heap.init()?;
+        self.heap_allocator = Some(heap);
 
         // 初始化统计信息
         self.stats.init(memory_map);
