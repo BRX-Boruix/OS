@@ -69,7 +69,7 @@ void kmain(void) {
     clear_screen();
     
     // 显示欢迎信息（使用原有显示系统）
-    print_string("BORUIX OS x86_64 - Rust Memory Manager\n");
+    print_string("BORUIX OS x86_64\n");
     print_string("========================================\n");
     print_string("Limine Bootloader OK\n\n");
     
@@ -141,23 +141,6 @@ void kmain(void) {
     print_string("========================================\n\n");
     
     // Loading动画
-    print_string("Loading");
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j <= i; j++) {
-            print_char('.');
-        }
-        
-        // 延迟1秒
-        unsigned char sec_start = read_cmos(0x00);
-        unsigned char sec_current;
-        do {
-            sec_current = read_cmos(0x00);
-        } while (sec_current == sec_start);
-        
-        if (i < 2) {
-            print_string("\rLoading");
-        }
-    }
     print_string(" Done!\n\n");
     
     // 调试：检查当前CS寄存器
@@ -190,18 +173,6 @@ void kmain(void) {
     
     __asm__ volatile("sti");
     print_string("Interrupts ENABLED!\n");
-    
-    print_string("Waiting 3 seconds...\n");
-    unsigned char sec_start = read_cmos(0x00);
-    for (int i = 0; i < 3; i++) {
-        unsigned char sec_cur;
-        do {
-            sec_cur = read_cmos(0x00);
-            __asm__ volatile("pause");
-        } while (sec_cur == sec_start);
-        sec_start = sec_cur;
-        print_char('.');
-    }
     
     print_string("\n\nTimer ticks: ");
     print_dec((uint32_t)get_interrupt_count(32));

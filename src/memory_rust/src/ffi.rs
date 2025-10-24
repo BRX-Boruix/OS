@@ -373,3 +373,130 @@ pub extern "C" fn rust_alloc_pages(_count: usize) -> u64 {
 pub extern "C" fn rust_free_pages(_start_addr: u64, _count: usize) {
     // 什么都不做
 }
+
+// ============================================================================
+// VMM (虚拟内存管理器) FFI 接口
+// ============================================================================
+
+/// 分配虚拟地址空间（不映射到物理内存）
+#[no_mangle]
+pub extern "C" fn rust_vmm_allocate(size: u64) -> u64 {
+    use crate::arch::addr::VirtAddr;
+
+    if size == 0 {
+        return 0;
+    }
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return 0;
+        }
+    };
+
+    // 获取VMM
+    let vmm = match manager.vmm.as_mut() {
+        Some(v) => v,
+        None => {
+            serial_log!("ERROR: VMM not initialized");
+            return 0;
+        }
+    };
+
+    // 分配虚拟地址
+    match vmm.allocate_kernel_heap(size) {
+        Ok(virt_addr) => virt_addr.as_u64(),
+        Err(_e) => {
+            serial_log!("ERROR: Failed to allocate virtual address");
+            0
+        }
+    }
+}
+
+/// 分配并映射虚拟内存
+#[no_mangle]
+pub extern "C" fn rust_vmm_map_and_allocate(size: u64, out_virt_addr: *mut u64) -> i32 {
+    use crate::vmm::VmmFlags;
+
+    if size == 0 || out_virt_addr.is_null() {
+        return -1;
+    }
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return -1;
+        }
+    };
+
+    // 获取VMM和页表管理器
+    let (vmm, page_table) = match (&mut manager.vmm, &mut manager.page_table_manager) {
+        (Some(v), Some(pt)) => (v, pt),
+        _ => {
+            serial_log!("ERROR: VMM or page table manager not initialized");
+            return -1;
+        }
+    };
+
+    // 创建标志（可写、不可执行）
+    let flags = VmmFlags::new().writable();
+
+    // 分配物理页面的闭包
+    let alloc_frame = || manager.physical_allocator.allocate_frame();
+
+    // 分配并映射
+    match vmm.allocate_and_map(page_table, size, flags, alloc_frame) {
+        Ok(virt_addr) => {
+            unsafe {
+                *out_virt_addr = virt_addr.as_u64();
+            }
+            0  // 成功
+        }
+        Err(_e) => {
+            serial_log!("ERROR: Failed to allocate and map memory");
+            -1  // 失败
+        }
+    }
+}
+
+/// 获取内核堆使用情况
+#[no_mangle]
+pub extern "C" fn rust_vmm_get_heap_usage(used: *mut u64, total: *mut u64) {
+    if used.is_null() || total.is_null() {
+        return;
+    }
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_ref() } {
+        Some(m) => m,
+        None => {
+            unsafe {
+                *used = 0;
+                *total = 0;
+            }
+            return;
+        }
+    };
+
+    // 获取VMM
+    let vmm = match manager.vmm.as_ref() {
+        Some(v) => v,
+        None => {
+            unsafe {
+                *used = 0;
+                *total = 0;
+            }
+            return;
+        }
+    };
+
+    let (used_bytes, total_bytes) = vmm.kernel_heap_usage();
+    unsafe {
+        *used = used_bytes;
+        *total = total_bytes;
+    }
+}
