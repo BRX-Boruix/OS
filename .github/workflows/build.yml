@@ -56,27 +56,60 @@ jobs:
         make clean
         make all
     
-    # 压缩build目录
-    - name: Compress build directory
+    # 构建x86_64架构（包含测试命令）
+    - name: Build x86_64 with TEST commands
+      run: |
+        echo "Building for architecture: x86_64 with TEST commands"
+        source $HOME/.cargo/env
+        make clean
+        make all TEST=1
+    
+    # 压缩build目录（标准版本）
+    - name: Compress build directory (standard)
       run: |
         cd build
         zip -r ../build_x86_64.zip .
         cd ..
         ls -la build_x86_64.zip
     
-    # 上传构建产物
-    - name: Upload build artifacts
+    # 压缩build目录（测试版本）
+    - name: Compress build directory (test version)
+      run: |
+        cd build
+        zip -r ../build_x86_64_test.zip .
+        cd ..
+        ls -la build_x86_64_test.zip
+    
+    # 上传构建产物（标准版本）
+    - name: Upload build artifacts (standard)
       uses: actions/upload-artifact@v4
       with:
         name: boruix-build-x86_64
         path: build_x86_64.zip
         retention-days: 30
     
-    # 上传ISO文件
-    - name: Upload ISO files
+    # 上传构建产物（测试版本）
+    - name: Upload build artifacts (test)
+      uses: actions/upload-artifact@v4
+      with:
+        name: boruix-build-x86_64-test
+        path: build_x86_64_test.zip
+        retention-days: 30
+    
+    # 上传ISO文件（标准版本）
+    - name: Upload ISO files (standard)
       uses: actions/upload-artifact@v4
       with:
         name: boruix-iso-x86_64
+        path: build/x86_64/*.iso
+        retention-days: 30
+      continue-on-error: true
+    
+    # 上传ISO文件（测试版本）
+    - name: Upload ISO files (test)
+      uses: actions/upload-artifact@v4
+      with:
+        name: boruix-iso-x86_64-test
         path: build/x86_64/*.iso
         retention-days: 30
       continue-on-error: true
@@ -90,6 +123,12 @@ jobs:
         ls -la build/x86_64/ || echo "No build directory found"
         echo "ISO files:"
         ls -la build/x86_64/*.iso || echo "No ISO files found"
-        echo "Compressed build size:"
-        ls -lh build_x86_64.zip || echo "No compressed file found"
+        echo "Compressed build sizes:"
+        ls -lh build_x86_64.zip || echo "No standard compressed file found"
+        ls -lh build_x86_64_test.zip || echo "No test compressed file found"
         echo "Build completed successfully!"
+        echo "Available artifacts:"
+        echo "  - boruix-build-x86_64 (standard version)"
+        echo "  - boruix-build-x86_64-test (with TEST commands)"
+        echo "  - boruix-iso-x86_64 (standard ISO)"
+        echo "  - boruix-iso-x86_64-test (test ISO)"
