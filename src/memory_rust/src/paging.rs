@@ -354,5 +354,52 @@ impl PageTableManager {
         let page_phys = pt_entry.phys_addr().unwrap();
         Ok(PhysAddr::new(page_phys.as_u64() + offset))
     }
+
+    // 获取页面的标志位
+    pub fn get_page_flags(&self, virt: VirtAddr) -> Result<u64, &'static str> {
+        // 检查地址对齐
+        if virt.as_u64() % PAGE_SIZE != 0 {
+            return Err("Address not page aligned");
+        }
+
+        // 获取页表索引
+        let indices = Self::get_page_table_indices(virt);
+
+        // 遍历页表层级
+        let pml4_virt = hhdm::phys_to_virt(self.pml4_addr);
+        let pml4 = unsafe { &*(pml4_virt.as_u64() as *const PageTable) };
+
+        // PML4 -> PDPT
+        let pml4_entry = pml4.get_entry(indices[0]).unwrap();
+        if !pml4_entry.is_present() {
+            return Err("PDPT not present");
+        }
+        let pdpt_virt = hhdm::phys_to_virt(pml4_entry.phys_addr().unwrap());
+        let pdpt = unsafe { &*(pdpt_virt.as_u64() as *const PageTable) };
+
+        // PDPT -> PD
+        let pdpt_entry = pdpt.get_entry(indices[1]).unwrap();
+        if !pdpt_entry.is_present() {
+            return Err("PD not present");
+        }
+        let pd_virt = hhdm::phys_to_virt(pdpt_entry.phys_addr().unwrap());
+        let pd = unsafe { &*(pd_virt.as_u64() as *const PageTable) };
+
+        // PD -> PT
+        let pd_entry = pd.get_entry(indices[2]).unwrap();
+        if !pd_entry.is_present() {
+            return Err("PT not present");
+        }
+        let pt_virt = hhdm::phys_to_virt(pd_entry.phys_addr().unwrap());
+        let pt = unsafe { &*(pt_virt.as_u64() as *const PageTable) };
+
+        // PT -> Page
+        let pt_entry = pt.get_entry(indices[3]).unwrap();
+        if !pt_entry.is_present() {
+            return Err("Page not mapped");
+        }
+
+        Ok(pt_entry.flags())
+    }
 }
 

@@ -615,3 +615,166 @@ pub extern "C" fn rust_heap_stats(
         *free_count = stats.free_count;
     }
 }
+
+// ============================================================================
+// 内存保护 FFI 接口
+// ============================================================================
+
+/// 设置页面为只读
+#[no_mangle]
+pub extern "C" fn rust_set_page_readonly(virt_addr: u64) -> i32 {
+    use crate::arch::addr::VirtAddr;
+    use crate::protection::ProtectionManager;
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return -1;
+        }
+    };
+
+    // 获取页表管理器
+    let page_table = match &mut manager.page_table_manager {
+        Some(pt) => pt,
+        None => {
+            serial_log!("ERROR: Page table manager not initialized");
+            return -1;
+        }
+    };
+
+    let virt = VirtAddr::new(virt_addr);
+
+    match ProtectionManager::set_readonly(page_table, virt) {
+        Ok(_) => 0,
+        Err(_e) => {
+            serial_log!("ERROR: Failed to set page readonly");
+            -1
+        }
+    }
+}
+
+/// 设置页面为可读写
+#[no_mangle]
+pub extern "C" fn rust_set_page_readwrite(virt_addr: u64) -> i32 {
+    use crate::arch::addr::VirtAddr;
+    use crate::protection::ProtectionManager;
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return -1;
+        }
+    };
+
+    // 获取页表管理器
+    let page_table = match &mut manager.page_table_manager {
+        Some(pt) => pt,
+        None => {
+            serial_log!("ERROR: Page table manager not initialized");
+            return -1;
+        }
+    };
+
+    let virt = VirtAddr::new(virt_addr);
+
+    match ProtectionManager::set_readwrite(page_table, virt) {
+        Ok(_) => 0,
+        Err(_e) => {
+            serial_log!("ERROR: Failed to set page readwrite");
+            -1
+        }
+    }
+}
+
+/// 设置页面为不可执行
+#[no_mangle]
+pub extern "C" fn rust_set_page_no_execute(virt_addr: u64) -> i32 {
+    use crate::arch::addr::VirtAddr;
+    use crate::protection::ProtectionManager;
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return -1;
+        }
+    };
+
+    // 获取页表管理器
+    let page_table = match &mut manager.page_table_manager {
+        Some(pt) => pt,
+        None => {
+            serial_log!("ERROR: Page table manager not initialized");
+            return -1;
+        }
+    };
+
+    let virt = VirtAddr::new(virt_addr);
+
+    match ProtectionManager::set_no_execute(page_table, virt) {
+        Ok(_) => 0,
+        Err(_e) => {
+            serial_log!("ERROR: Failed to set page no-execute");
+            -1
+        }
+    }
+}
+
+/// 获取页面保护标志
+#[no_mangle]
+pub extern "C" fn rust_get_page_flags(
+    virt_addr: u64,
+    out_present: *mut bool,
+    out_writable: *mut bool,
+    out_user: *mut bool,
+    out_executable: *mut bool,
+) -> i32 {
+    use crate::arch::addr::VirtAddr;
+    use crate::protection::ProtectionManager;
+
+    if out_present.is_null() || out_writable.is_null() 
+        || out_user.is_null() || out_executable.is_null() {
+        return -1;
+    }
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_ref() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return -1;
+        }
+    };
+
+    // 获取页表管理器
+    let page_table = match &manager.page_table_manager {
+        Some(pt) => pt,
+        None => {
+            serial_log!("ERROR: Page table manager not initialized");
+            return -1;
+        }
+    };
+
+    let virt = VirtAddr::new(virt_addr);
+
+    match ProtectionManager::get_page_protection(page_table, virt) {
+        Ok(flags) => {
+            unsafe {
+                *out_present = flags.present;
+                *out_writable = flags.writable;
+                *out_user = flags.user;
+                *out_executable = flags.executable;
+            }
+            0
+        }
+        Err(_e) => {
+            serial_log!("ERROR: Failed to get page protection");
+            -1
+        }
+    }
+}
