@@ -5,6 +5,11 @@
 # 架构选择 (仅支持x86_64)
 ARCH := x86_64
 
+# 检查是否启用测试命令（通过环境变量或命令行变量）
+ifdef TEST
+    ENABLE_TEST := 1
+endif
+
 # 编译器设置
 AS = nasm
 CC = gcc
@@ -14,6 +19,10 @@ CARGO = cargo
 # 架构相关设置 (仅x86_64)
 ASFLAGS = -f elf64
 CFLAGS = -m64 -std=c99 -nostdlib -nostdinc -fno-builtin -fno-stack-protector -Wall -Wextra -mcmodel=kernel -mno-red-zone -mno-mmx -mno-sse -mno-sse2 -fno-pic -ffunction-sections -fdata-sections
+# 如果启用测试命令，添加条件编译宏
+ifdef ENABLE_TEST
+    CFLAGS += -DENABLE_TEST_COMMANDS
+endif
 LDFLAGS = -m elf_x86_64 -nostdlib -static -z max-page-size=0x1000 -gc-sections -T $(BUILD_ARCH_DIR)/linker.ld
 QEMU = qemu-system-x86_64
 ARCH_DIR = x86_64
@@ -79,8 +88,37 @@ KERNEL_OBJS = $(KERNEL_C_OBJS) $(KERNEL_ASM_OBJS) $(RUST_LIBS)
 
 LINKER_SCRIPT = $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/linker.ld
 
+# TEST状态标记文件
+TEST_FLAG_FILE = $(BUILD_ARCH_DIR)/.test_mode
+
+# 检查TEST模式是否改变，如果改变则删除标记文件强制重新编译
+.PHONY: check-test-mode
+check-test-mode:
+	@if [ -f "$(TEST_FLAG_FILE)" ]; then \
+		if [ "$(ENABLE_TEST)" = "1" ]; then \
+			if ! grep -q "TEST=1" "$(TEST_FLAG_FILE)" 2>/dev/null; then \
+				echo "检测到TEST模式变化，清理构建..."; \
+				rm -f $(KERNEL_C_OBJS); \
+				echo "TEST=1" > "$(TEST_FLAG_FILE)"; \
+			fi \
+		else \
+			if grep -q "TEST=1" "$(TEST_FLAG_FILE)" 2>/dev/null; then \
+				echo "检测到TEST模式变化，清理构建..."; \
+				rm -f $(KERNEL_C_OBJS); \
+				echo "TEST=0" > "$(TEST_FLAG_FILE)"; \
+			fi \
+		fi \
+	else \
+		mkdir -p $(BUILD_ARCH_DIR); \
+		if [ "$(ENABLE_TEST)" = "1" ]; then \
+			echo "TEST=1" > "$(TEST_FLAG_FILE)"; \
+		else \
+			echo "TEST=0" > "$(TEST_FLAG_FILE)"; \
+		fi \
+	fi
+
 # 默认目标
-all: $(ISO)
+all: check-test-mode $(ISO)
 
 # 强制重新构建
 rebuild: clean all
@@ -262,11 +300,14 @@ help:
 	@echo ""
 	@echo "主要目标:"
 	@echo "  all           - 构建完整的ISO镜像（包含C和Rust代码）"
+	@echo "  make all TEST=1    - 构建包含测试命令的ISO镜像"
 	@echo "  rebuild       - 强制重新构建"
+	@echo "  make rebuild TEST=1 - 强制重新构建（包含测试命令）"
 	@echo "  clean         - 清理构建文件（包含Rust构建产物）"
 	@echo "  clean-all     - 清理所有构建文件"
 	@echo "  distclean     - 深度清理"
 	@echo "  run           - 在QEMU中运行ISO"
+	@echo "  make run TEST=1    - 在QEMU中运行包含测试命令的ISO"
 	@echo ""
 	@echo "Rust相关目标:"
 	@echo "  build-rust    - 仅构建所有Rust项目"
@@ -278,5 +319,9 @@ help:
 	@echo "  install-limine - 安装Limine引导加载程序"
 	@echo "  info          - 显示架构和Rust信息"
 	@echo "  help          - 显示此帮助"
+	@echo ""
+	@echo "选项:"
+	@echo "  TEST=1        - 启用测试命令（可与 all、rebuild、run 配合使用）"
+	@echo "                  示例: make all TEST=1"
 
 .PHONY: all rebuild clean clean-all distclean run install-limine build-all build-rust check-rust fmt-rust clippy-rust info help
