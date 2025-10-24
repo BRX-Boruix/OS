@@ -250,7 +250,7 @@ pub mod addr {
 
     /// 虚拟地址
     #[repr(transparent)]
-    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
     pub struct VirtAddr(pub u64);
 
     impl VirtAddr {
@@ -287,7 +287,7 @@ pub mod addr {
 
     /// 物理地址
     #[repr(transparent)]
-    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
     pub struct PhysAddr(pub u64);
 
     impl PhysAddr {
