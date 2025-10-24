@@ -57,8 +57,8 @@ static void double_fault_handler(registers_t* regs) {
     print_string("#                           BORUIX KERNEL PANIC                               #\n");
     print_string("#                                                                             #\n");
     print_string("#  The kernel crashed.                                                        #\n");
-    print_string("#  The first level of error interception (SYSTEM HAS DEAD PAGE) is not caught #\n");
-    print_string("#  , which is a very serious problem.                                         #\n");
+    print_string("#  The first level of error interception (aka SHD PAGE) is not caught, which  #\n");
+    print_string("#  is a very serious problem.                                                 #\n");
     print_string("#  This is a protected page to provide as much critical information as        #\n");
     print_string("#  possible.                                                                  #\n");
     print_string("#  Please go to https://os.boruix.thelang.cn/terrible/help for                #\n");
@@ -191,7 +191,7 @@ void isr_handler(registers_t* regs) {
         // 其他异常的通用处理
         __asm__ volatile("cli");
         print_string("\n========================================\n");
-        print_string("\nSYSTEAM HAS DEAD. \n");
+        print_string("\nSYSTEAM HAS DEAD. (SHD PAGE)\n");
         print_string("\n========================================\n");
         print_string("[EXCEPTION] ");
         print_string(exception_messages[int_no]);
