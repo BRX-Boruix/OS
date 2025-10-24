@@ -13,6 +13,7 @@ pub mod lazy_buddy;  // 懒加载伙伴分配器
 pub mod paging;  // 分页管理
 pub mod vmm;  // 虚拟内存管理
 pub mod heap;  // 堆分配器
+pub mod protection;  // 内存保护
 pub mod stats;
 
 // 导出主要接口
@@ -20,6 +21,7 @@ pub use stats::*;
 pub use paging::*;
 pub use vmm::*;
 pub use heap::*;
+pub use protection::*;
 
 /// 全局内存管理器实例
 static mut MEMORY_MANAGER: Option<MemoryManager> = None;
