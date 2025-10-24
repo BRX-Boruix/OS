@@ -171,24 +171,115 @@ pub extern "C" fn rust_free_page(page_addr: u64) {
 }
 
 /// 映射虚拟页面到物理页面
-/// 阶段2: 仍返回失败
+/// 阶段2C: 实现页表映射
 #[no_mangle]
-pub extern "C" fn rust_map_page(_virtual_addr: u64, _physical_addr: u64, _flags: u64) -> i32 {
-    -1  // 失败
+pub extern "C" fn rust_map_page(virtual_addr: u64, physical_addr: u64, flags: u64) -> i32 {
+    use crate::arch::addr::{VirtAddr, PhysAddr};
+    use crate::paging::PAGE_PRESENT;
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return -1;
+        }
+    };
+
+    // 获取页表管理器
+    let page_table_manager = match manager.page_table_manager.as_mut() {
+        Some(ptm) => ptm,
+        None => {
+            serial_log!("ERROR: Page table manager not initialized");
+            return -1;
+        }
+    };
+
+    let virt = VirtAddr::new(virtual_addr);
+    let phys = PhysAddr::new(physical_addr);
+
+    // 使用物理分配器作为页表分配器
+    let alloc_frame = || manager.physical_allocator.allocate_frame();
+
+    // 执行映射
+    match page_table_manager.map_page(virt, phys, flags | PAGE_PRESENT, alloc_frame) {
+        Ok(_) => 0,  // 成功
+        Err(_e) => {
+            serial_log!("ERROR: Failed to map page");
+            -1  // 失败
+        }
+    }
 }
 
 /// 取消页面映射
-/// 阶段2: 仍返回0
+/// 阶段2C: 实现页面取消映射
 #[no_mangle]
-pub extern "C" fn rust_unmap_page(_virtual_addr: u64) -> u64 {
-    0
+pub extern "C" fn rust_unmap_page(virtual_addr: u64) -> u64 {
+    use crate::arch::addr::VirtAddr;
+
+    if virtual_addr == 0 {
+        return 0;
+    }
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => {
+            serial_log!("ERROR: Memory manager not initialized");
+            return 0;
+        }
+    };
+
+    // 获取页表管理器
+    let page_table_manager = match manager.page_table_manager.as_mut() {
+        Some(ptm) => ptm,
+        None => {
+            serial_log!("ERROR: Page table manager not initialized");
+            return 0;
+        }
+    };
+
+    let virt = VirtAddr::new(virtual_addr);
+
+    // 执行取消映射
+    match page_table_manager.unmap_page(virt) {
+        Ok(phys) => phys.as_u64(),  // 返回物理地址
+        Err(_e) => {
+            serial_log!("ERROR: Failed to unmap page");
+            0  // 失败
+        }
+    }
 }
 
 /// 虚拟地址转物理地址
-/// 阶段2: 仍返回0
+/// 阶段2C: 实现地址转换
 #[no_mangle]
-pub extern "C" fn rust_virt_to_phys(_virtual_addr: u64) -> u64 {
-    0
+pub extern "C" fn rust_virt_to_phys(virtual_addr: u64) -> u64 {
+    use crate::arch::addr::VirtAddr;
+
+    if virtual_addr == 0 {
+        return 0;
+    }
+
+    // 获取全局内存管理器实例
+    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
+        Some(m) => m,
+        None => return 0,
+    };
+
+    // 获取页表管理器
+    let page_table_manager = match manager.page_table_manager.as_ref() {
+        Some(ptm) => ptm,
+        None => return 0,
+    };
+
+    let virt = VirtAddr::new(virtual_addr);
+
+    // 执行地址转换
+    match page_table_manager.translate(virt) {
+        Ok(phys) => phys.as_u64(),
+        Err(_) => 0,  // 失败
+    }
 }
 
 /// C兼容的内存摘要结构

@@ -13,6 +13,9 @@ void cmd_memtest(int argc, char* argv[]);
 // 声明dftest命令函数
 void cmd_dftest(int argc, char* argv[]);
 
+// 声明pgtest命令函数
+void cmd_pgtest(int argc, char* argv[]);
+
 // 命令表
 static shell_command_t commands[] = {
     {"help", "Show available commands", cmd_help},
@@ -30,6 +33,7 @@ static shell_command_t commands[] = {
     {"great", "Let the great Yang Borui give you the answer.", cmd_great},
     {"crash", "Manually trigger system crash", cmd_crash},
     {"dftest", "Test double fault handler", cmd_dftest},
+    {"pgtest", "Test page table mapping and translation", cmd_pgtest},
     {"license", "Show license information for projects", cmd_license},
     {"keytest", "Test keyboard input and scancodes", cmd_keytest},
     {"memtest", "Test TTY memory management and page tables", cmd_memtest},
