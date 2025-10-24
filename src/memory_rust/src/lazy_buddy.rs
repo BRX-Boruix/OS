@@ -72,6 +72,11 @@ impl PhysFrame {
     pub const fn start_address(&self) -> PhysAddr {
         self.start_address
     }
+
+    // 别名方法，与start_address()相同
+    pub const fn addr(&self) -> PhysAddr {
+        self.start_address
+    }
 }
 
 /// 懒加载伙伴分配器
@@ -212,7 +217,7 @@ impl LazyBuddyAllocator {
                 self.uninit_count += 1;
             }
 
-            frame_idx += (actual_end - start_frame as usize);
+            frame_idx += actual_end - start_frame as usize;
         }
 
         // 6. 设置当前分配位置
