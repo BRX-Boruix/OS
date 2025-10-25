@@ -1,4 +1,4 @@
-# Boruix OS
+# Boruix Operating System
 ## Feel so mini&toy, right?
 ![logo](https://github.com/user-attachments/assets/cb05dd2c-c668-4b43-8a25-5b73867aa3e8)
 
