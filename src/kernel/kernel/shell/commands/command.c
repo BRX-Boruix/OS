@@ -58,7 +58,6 @@ static shell_command_t commands[] = {
     {"heaptest", "Test heap allocator (kmalloc/kfree)", cmd_heaptest},
     {"memprottest", "Test memory protection mechanism", cmd_memprottest},
     {"memtest", "Test TTY memory management and page tables", cmd_memtest},
-    {"vmtest", "Test process address space isolation", builtin_vmtest},
     {"test", "Test command", cmd_test},
 #endif
     {NULL, NULL, NULL}  // 结束标记

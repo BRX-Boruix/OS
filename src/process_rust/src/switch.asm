@@ -5,12 +5,10 @@ section .text
 global switch_context
 
 ; 上下文切换函数
-; void switch_context(ProcessContext* from, const ProcessContext* to, uint64_t from_cr3, uint64_t to_cr3)
+; void switch_context(ProcessContext* from, const ProcessContext* to)
 ; 参数:
 ;   rdi = from (源进程上下文指针)
 ;   rsi = to   (目标进程上下文指针)
-;   rdx = from_cr3 (源进程CR3，用于保存)
-;   rcx = to_cr3   (目标进程CR3，用于加载)
 switch_context:
     ; 保存当前进程的上下文到from
     ; 按照ProcessContext结构体的顺序保存寄存器
@@ -59,14 +57,6 @@ switch_context:
     movzx rax, ax
     mov [rdi + 168], rax
     
-    ; 切换页表(如果to_cr3不为0)
-    test rcx, rcx
-    jz .skip_cr3_switch
-    
-    ; 加载新的CR3
-    mov cr3, rcx
-    
-.skip_cr3_switch:
     ; 恢复目标进程的上下文从to
     
     ; 恢复通用寄存器

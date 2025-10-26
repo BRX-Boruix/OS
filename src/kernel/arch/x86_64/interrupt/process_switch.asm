@@ -60,64 +60,9 @@ irq_timer_with_switch:
     jz .no_switch
     
     ; 需要切换进程
-    ; rax指向新进程的上下文（PCB中的ProcessContext结构）
-    
-    ; 保存rax到rbx（新进程上下文指针）
-    mov rbx, rax
-    
-    ; 获取新进程的CR3（调用Rust FFI）
-    extern rust_get_next_process_cr3
-    call rust_get_next_process_cr3
-    
-    ; rax现在包含新进程的CR3
-    ; 如果CR3不为0，加载它
-    test rax, rax
-    jz .skip_cr3_load
-    mov cr3, rax
-    
-.skip_cr3_load:
-    ; rbx指向新进程的上下文（PCB中的ProcessContext）
-    ; ProcessContext布局：
-    ; 0: rax, 8: rbx, 16: rcx, 24: rdx, 32: rsi, 40: rdi, 48: rbp
-    ; 56: r8, 64: r9, 72: r10, 80: r11, 88: r12, 96: r13, 104: r14, 112: r15
-    ; 120: int_no, 128: err_code
-    ; 136: rip, 144: cs, 152: rflags, 160: rsp, 168: ss
-    
-    ; 获取新进程的栈指针
-    mov rsp, [rbx + 160]
-    
-    ; 在栈上构建iretq栈帧
-    push qword [rbx + 168]  ; SS
-    push qword [rbx + 160]  ; RSP
-    push qword [rbx + 152]  ; RFLAGS
-    push qword [rbx + 144]  ; CS
-    push qword [rbx + 136]  ; RIP
-    
-    ; 发送EOI到PIC
-    push rax
-    mov al, PIC_EOI
-    out PIC1_COMMAND, al
-    pop rax
-    
-    ; 恢复所有通用寄存器
-    mov r15, [rbx + 112]
-    mov r14, [rbx + 104]
-    mov r13, [rbx + 96]
-    mov r12, [rbx + 88]
-    mov r11, [rbx + 80]
-    mov r10, [rbx + 72]
-    mov r9, [rbx + 64]
-    mov r8, [rbx + 56]
-    mov rbp, [rbx + 48]
-    mov rdi, [rbx + 40]
-    mov rsi, [rbx + 32]
-    mov rdx, [rbx + 24]
-    mov rcx, [rbx + 16]
-    mov rax, [rbx + 0]
-    mov rbx, [rbx + 8]
-    
-    ; 执行中断返回
-    iretq
+    ; rax指向新进程的上下文
+    mov rsp, rax        ; 切换到新进程的上下文栈
+    jmp .restore_context
     
 .no_switch:
     ; 不切换，恢复原来的栈指针

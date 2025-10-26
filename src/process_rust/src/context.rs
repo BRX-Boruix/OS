@@ -165,11 +165,6 @@ impl ProcessContext {
 
 // 上下文切换函数（在汇编中实现）
 extern "C" {
-    pub fn switch_context(
-        from: *mut ProcessContext,
-        to: *const ProcessContext,
-        from_cr3: u64,
-        to_cr3: u64,
-    );
+    pub fn switch_context(from: *mut ProcessContext, to: *const ProcessContext);
 }
 
