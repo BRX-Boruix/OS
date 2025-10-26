@@ -20,4 +20,7 @@ uint32_t timer_get_seconds(void);
 // 定时器中断处理
 void timer_irq_handler(void);
 
+// 设置调度器初始化状态
+void timer_set_scheduler_initialized(bool initialized);
+
 #endif // BORUIX_TIMER_H

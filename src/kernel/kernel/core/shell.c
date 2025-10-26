@@ -168,8 +168,12 @@ void shell_main(void) {
     shell_print_prompt();
     
     while (1) {
-        // 使用中断处理
-        __asm__ volatile("hlt");
+        // 检查是否有输入事件需要处理
+        if (!keyboard_has_char() && !keyboard_has_combo_event()) {
+            // 没有输入事件，使用hlt等待中断（节省CPU）
+            __asm__ volatile("hlt");
+            continue;  // 被唤醒后重新检查
+        }
         
         // 确保中断处理完成后继续执行
         __asm__ volatile("" ::: "memory");

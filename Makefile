@@ -50,6 +50,8 @@ LIMINE_DIR = limine
 # 自动发现所有C源文件
 KERNEL_COMMON_SRCS = $(wildcard $(SRC_DIR)/kernel/kernel/core/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/kernel/debug/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/kernel/process/*.c) \
+                     $(wildcard $(SRC_DIR)/kernel/kernel/panic/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/kernel/shell/**/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/kernel/shell/**/**/*.c) \
                      $(wildcard $(SRC_DIR)/kernel/drivers/cmos/*.c) \
@@ -72,13 +74,15 @@ KERNEL_SRCS = $(sort $(KERNEL_COMMON_SRCS) $(KERNEL_ARCH_SRCS))
 # 自动发现架构特定的汇编文件
 KERNEL_ASM_SRCS := $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/*.asm) \
                    $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/*.asm) \
-                   $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupt/*.asm)
+                   $(wildcard $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/interrupt/*.asm) \
+                   $(wildcard $(SRC_DIR)/process_rust/src/*.asm)
 
 # 自动发现所有Rust项目（查找包含Cargo.toml的目录）
 RUST_PROJECTS := $(shell find $(SRC_DIR) -name "Cargo.toml" -exec dirname {} \; 2>/dev/null)
 
 # 生成Rust库文件列表（明确指定已知的库文件）
-RUST_LIBS := $(SRC_DIR)/memory_rust/librust_memory.a
+RUST_LIBS := $(SRC_DIR)/memory_rust/librust_memory.a \
+             $(SRC_DIR)/process_rust/librust_process.a
 
 # 生成对象文件列表（加上语言后缀避免C和ASM重名）
 # 格式：父文件夹-文件名-语言.o
@@ -171,6 +175,11 @@ $(SRC_DIR)/memory_rust/librust_memory.a: $(SRC_DIR)/memory_rust/Cargo.toml $(wil
 	@cd $(SRC_DIR)/memory_rust && RUSTFLAGS="$(RUSTFLAGS)" $(CARGO) build --release --target $(RUST_TARGET)
 	@cd $(SRC_DIR)/memory_rust && cp target/$(RUST_TARGET)/release/libboruix_memory.a librust_memory.a
 
+$(SRC_DIR)/process_rust/librust_process.a: $(SRC_DIR)/process_rust/Cargo.toml $(wildcard $(SRC_DIR)/process_rust/src/*.rs)
+	@echo "构建Rust进程管理器..."
+	@cd $(SRC_DIR)/process_rust && RUSTFLAGS="$(RUSTFLAGS)" $(CARGO) build --release --target $(RUST_TARGET)
+	@cd $(SRC_DIR)/process_rust && cp target/$(RUST_TARGET)/release/libboruix_process.a librust_process.a
+
 # 链接内核
 $(KERNEL): $(KERNEL_OBJS) $(BUILD_ARCH_DIR)/linker.ld
 	$(LD) $(LDFLAGS) -o $@ $(KERNEL_OBJS)
@@ -222,7 +231,7 @@ distclean: clean-all
 
 # 运行虚拟机
 run: $(ISO)
-	$(QEMU) -cdrom $(ISO) -boot d -serial stdio -no-reboot -d cpu_reset
+	$(QEMU) -cdrom $(ISO) -boot d -serial stdio -no-reboot -d cpu_reset -m 512M -vga std
 
 # 安装Limine（如果需要）
 install-limine:

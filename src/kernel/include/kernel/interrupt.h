@@ -32,6 +32,14 @@ static inline bool interrupts_enabled(void) {
 // 中断初始化函数（由架构特定代码实现）
 void interrupt_init(void);
 
+// 进程切换相关函数
+void enable_process_switching(void);
+void disable_process_switching(void);
+void idt_set_timer_handler_with_switch(void);
+
+// 首次进程切换
+void switch_to_first_process(uint32_t pid);
+
 // 中断优先级管理函数
 void irq_priority_init(void);
 void irq_set_priority(uint8_t irq, uint8_t priority);

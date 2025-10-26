@@ -9,6 +9,10 @@
 
 static struct flanterm_context *ft_ctx = NULL;
 
+// 显示锁函数声明
+extern void display_acquire_lock(void);
+extern void display_release_lock(void);
+
 // 终端历史缓冲区管理
 #define TERMINAL_HISTORY_SIZE 1000  // 历史行数
 #define TERMINAL_LINE_SIZE 256      // 每行最大字符数
@@ -66,14 +70,20 @@ void display_init(struct limine_framebuffer *framebuffer) {
 
 void clear_screen(void) {
     if (!ft_ctx) return;
+    
+    display_acquire_lock();
     // 使用ANSI转义序列清屏
     flanterm_write(ft_ctx, "\033[2J", 4);
     flanterm_write(ft_ctx, "\033[H", 3);  // 移动光标到左上角
     flanterm_flush(ft_ctx);
+    display_release_lock();
 }
 
 void set_cursor(int x, int y) {
     if (!ft_ctx) return;
+    
+    display_acquire_lock();
+    
     // 使用ANSI转义序列设置光标位置
     char buffer[32];
     int i = 0;
@@ -103,10 +113,14 @@ void set_cursor(int x, int y) {
     
     flanterm_write(ft_ctx, buffer, i);
     flanterm_flush(ft_ctx);
+    
+    display_release_lock();
 }
 
 void print_char(char c) {
     if (!ft_ctx) return;
+    
+    display_acquire_lock();
     
     // 如果启用了输出捕获，将字符添加到历史缓冲区
     if (output_capture_enabled) {
@@ -116,10 +130,14 @@ void print_char(char c) {
     
     flanterm_write(ft_ctx, &c, 1);
     // 不立即flush，让flanterm内部处理
+    
+    display_release_lock();
 }
 
 void print_string(const char* str) {
     if (!ft_ctx || !str) return;
+    
+    display_acquire_lock();
     
     // 如果启用了输出捕获，将输出添加到历史缓冲区
     if (output_capture_enabled) {
@@ -128,6 +146,8 @@ void print_string(const char* str) {
     
     flanterm_write(ft_ctx, str, shell_strlen(str));
     // 不立即flush，让flanterm内部处理
+    
+    display_release_lock();
 }
 
 void delay(int count) {
@@ -207,12 +227,16 @@ void print_dec(uint32_t value) {
     }
     
     buffer[i] = '\0';
+    
+    // print_string已经有锁了，不需要再加锁
     print_string(buffer);
 }
 
 // 颜色设置（flanterm支持ANSI颜色）
 void set_color(uint8_t fg, uint8_t bg) {
     if (!ft_ctx) return;
+    
+    display_acquire_lock();
     
     // 使用ANSI转义序列设置颜色
     char buffer[32];
@@ -245,12 +269,17 @@ void set_color(uint8_t fg, uint8_t bg) {
     
     flanterm_write(ft_ctx, buffer, i);
     flanterm_flush(ft_ctx);
+    
+    display_release_lock();
 }
 
 // 手动刷新显示
 void display_flush(void) {
     if (!ft_ctx) return;
+    
+    display_acquire_lock();
     flanterm_flush(ft_ctx);
+    display_release_lock();
 }
 
 // 获取flanterm上下文（用于高级功能）
