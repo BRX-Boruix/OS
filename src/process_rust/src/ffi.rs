@@ -84,9 +84,54 @@ pub extern "C" fn rust_create_process(
         return INVALID_PID;
     }
     
+    // 为进程创建独立页表
+    extern "C" {
+        fn rust_create_process_page_table() -> u64;
+    }
+    let cr3 = unsafe { rust_create_process_page_table() };
+    if cr3 == 0 {
+        // 页表创建失败
+        return INVALID_PID;
+    }
+    pcb.set_cr3(cr3);
+    
     // 初始化上下文
     if let Some(stack_ptr) = pcb.kernel_stack_ptr() {
         pcb.context_mut().init_kernel_context(entry_point, stack_ptr);
+        
+        // 将上下文复制到栈上，以便进程切换代码能正确恢复
+        // 栈布局应该与中断压栈后的布局一致
+        unsafe {
+            let ctx = pcb.context();
+            let mut sp = stack_ptr as *mut u64;
+            
+            // 按照中断栈帧的顺序压栈（从高到低）
+            sp = sp.sub(1); *sp = ctx.ss;
+            sp = sp.sub(1); *sp = ctx.rsp;
+            sp = sp.sub(1); *sp = ctx.rflags;
+            sp = sp.sub(1); *sp = ctx.cs;
+            sp = sp.sub(1); *sp = ctx.rip;
+            sp = sp.sub(1); *sp = ctx.err_code;
+            sp = sp.sub(1); *sp = ctx.int_no;
+            sp = sp.sub(1); *sp = ctx.r15;
+            sp = sp.sub(1); *sp = ctx.r14;
+            sp = sp.sub(1); *sp = ctx.r13;
+            sp = sp.sub(1); *sp = ctx.r12;
+            sp = sp.sub(1); *sp = ctx.r11;
+            sp = sp.sub(1); *sp = ctx.r10;
+            sp = sp.sub(1); *sp = ctx.r9;
+            sp = sp.sub(1); *sp = ctx.r8;
+            sp = sp.sub(1); *sp = ctx.rbp;
+            sp = sp.sub(1); *sp = ctx.rdi;
+            sp = sp.sub(1); *sp = ctx.rsi;
+            sp = sp.sub(1); *sp = ctx.rdx;
+            sp = sp.sub(1); *sp = ctx.rcx;
+            sp = sp.sub(1); *sp = ctx.rbx;
+            sp = sp.sub(1); *sp = ctx.rax;
+            
+            // 更新上下文中的RSP指向栈上的上下文
+            pcb.context_mut().rsp = sp as u64;
+        }
     }
     
     // 设置为就绪状态
@@ -116,6 +161,16 @@ pub extern "C" fn rust_destroy_process(pid: ProcessId) -> i32 {
     if let Some(pcb) = manager.get_process_mut(pid) {
         // 设置为终止状态
         pcb.set_state(state::ProcessState::Terminated);
+        
+        // 释放进程页表
+        if let Some(cr3) = pcb.cr3() {
+            extern "C" {
+                fn rust_free_process_page_table(cr3: u64);
+            }
+            unsafe {
+                rust_free_process_page_table(cr3);
+            }
+        }
         
         // 从队列中移除
         manager.ready_queue.remove(pid);
@@ -373,21 +428,21 @@ pub extern "C" fn rust_disable_scheduler() {
 pub extern "C" fn rust_context_switch(from_pid: ProcessId, to_pid: ProcessId) -> i32 {
     let manager = ProcessManager::instance();
     
-    // 获取源进程上下文
-    let from_context = match manager.get_process_mut(from_pid) {
-        Some(from_pcb) => from_pcb.context_mut() as *mut _,
+    // 获取源进程上下文和CR3
+    let (from_context, from_cr3) = match manager.get_process_mut(from_pid) {
+        Some(from_pcb) => (from_pcb.context_mut() as *mut _, from_pcb.cr3().unwrap_or(0)),
         None => return -1,
     };
     
-    // 获取目标进程上下文
-    let to_context = match manager.get_process(to_pid) {
-        Some(to_pcb) => to_pcb.context() as *const _,
+    // 获取目标进程上下文和CR3
+    let (to_context, to_cr3) = match manager.get_process(to_pid) {
+        Some(to_pcb) => (to_pcb.context() as *const _, to_pcb.cr3().unwrap_or(0)),
         None => return -1,
     };
     
     // 执行上下文切换
     unsafe {
-        context::switch_context(from_context, to_context);
+        context::switch_context(from_context, to_context, from_cr3, to_cr3);
     }
     
     0
@@ -551,10 +606,37 @@ pub extern "C" fn rust_get_next_process_context() -> *const context::ProcessCont
     manager.scheduler.record_context_switch(current_pid, next_pid);
     manager.scheduler.record_schedule();
     
-    // 获取新进程的上下文指针
+    // 获取新进程的上下文指针（PCB中的上下文）
     match manager.get_process(next_pid) {
         Some(pcb) => pcb.context() as *const _,
         None => ptr::null(),
+    }
+}
+
+/// 获取下一个进程的CR3值
+/// 返回值：CR3值，如果没有下一个进程或CR3未设置则返回0
+#[no_mangle]
+pub extern "C" fn rust_get_next_process_cr3() -> u64 {
+    let manager = ProcessManager::instance();
+    
+    // 获取当前进程（已经被rust_get_next_process_context设置）
+    if let Some(current_pid) = manager.scheduler.current_process() {
+        if let Some(pcb) = manager.get_process(current_pid) {
+            return pcb.cr3().unwrap_or(0);
+        }
+    }
+    
+    0
+}
+
+/// 获取指定进程的CR3值
+#[no_mangle]
+pub extern "C" fn rust_get_process_cr3(pid: ProcessId) -> u64 {
+    let manager = ProcessManager::instance();
+    
+    match manager.get_process(pid) {
+        Some(pcb) => pcb.cr3().unwrap_or(0),
+        None => 0,
     }
 }
 

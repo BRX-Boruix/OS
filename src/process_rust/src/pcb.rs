@@ -27,6 +27,8 @@ pub struct ProcessControlBlock {
     priority: Priority,
     /// 进程上下文
     context: ProcessContext,
+    /// 页表物理地址(CR3寄存器值)
+    cr3: Option<u64>,
     /// 内核栈指针
     kernel_stack_ptr: Option<usize>,
     /// 内核栈基址
@@ -63,6 +65,7 @@ impl ProcessControlBlock {
             block_reason: BlockReason::None,
             priority: Priority::Normal,
             context: ProcessContext::new(),
+            cr3: None,
             kernel_stack_ptr: None,
             kernel_stack_base: None,
             user_stack_ptr: None,
@@ -134,6 +137,16 @@ impl ProcessControlBlock {
     /// 获取可变上下文
     pub fn context_mut(&mut self) -> &mut ProcessContext {
         &mut self.context
+    }
+
+    /// 获取CR3(页表物理地址)
+    pub fn cr3(&self) -> Option<u64> {
+        self.cr3
+    }
+
+    /// 设置CR3(页表物理地址)
+    pub fn set_cr3(&mut self, cr3: u64) {
+        self.cr3 = Some(cr3);
     }
 
     /// 获取内核栈指针

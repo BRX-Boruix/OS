@@ -132,6 +132,11 @@ impl PageTableManager {
         Ok(PageTableManager { pml4_addr })
     }
 
+    // 从物理地址创建管理器
+    pub fn from_phys_addr(pml4_addr: PhysAddr) -> Self {
+        PageTableManager { pml4_addr }
+    }
+
     // 创建新的页表(分配新的PML4)
     pub fn new<F>(alloc_frame: F) -> Result<Self, &'static str>
     where
@@ -400,6 +405,104 @@ impl PageTableManager {
         }
 
         Ok(pt_entry.flags())
+    }
+
+    /// 为进程创建新的页表
+    /// 复制内核空间映射(高地址)，用户空间(低地址)留空
+    pub fn clone_kernel_mappings<F>(
+        &self,
+        mut alloc_frame: F,
+    ) -> Result<Self, &'static str>
+    where
+        F: FnMut() -> Option<PhysFrame>,
+    {
+        // 分配新的PML4
+        let new_pml4_frame = alloc_frame().ok_or("Failed to allocate PML4 for process")?;
+        let new_pml4_addr = new_pml4_frame.addr();
+
+        // 通过HHDM访问新旧PML4
+        let new_pml4_virt = hhdm::phys_to_virt(new_pml4_addr);
+        let new_pml4_ptr = new_pml4_virt.as_u64() as *mut PageTable;
+
+        let old_pml4_virt = hhdm::phys_to_virt(self.pml4_addr);
+        let old_pml4_ptr = old_pml4_virt.as_u64() as *const PageTable;
+
+        unsafe {
+            // 清空新PML4
+            (*new_pml4_ptr).zero_entries();
+
+            // 复制内核空间映射(PML4索引256-511，对应0xFFFF800000000000及以上)
+            // 这包括内核代码、数据和HHDM映射
+            for i in 256..ENTRIES_PER_TABLE {
+                let old_entry = (*old_pml4_ptr).get_entry(i).unwrap();
+                if old_entry.is_present() {
+                    // 直接复制页表项(共享内核页表)
+                    if let Some(new_entry) = (*new_pml4_ptr).get_entry_mut(i) {
+                        *new_entry = *old_entry;
+                    }
+                }
+            }
+        }
+
+        Ok(PageTableManager {
+            pml4_addr: new_pml4_addr,
+        })
+    }
+
+    /// 释放进程页表
+    /// 只释放用户空间的页表(PML4索引0-255)，内核空间共享不释放
+    pub fn free_process_page_tables<F>(&self, mut free_frame: F)
+    where
+        F: FnMut(PhysAddr),
+    {
+        let pml4_virt = hhdm::phys_to_virt(self.pml4_addr);
+        let pml4 = unsafe { &*(pml4_virt.as_u64() as *const PageTable) };
+
+        // 遍历用户空间的PML4条目(索引0-255)
+        for pml4_idx in 0..256 {
+            let pml4_entry = pml4.get_entry(pml4_idx).unwrap();
+            if !pml4_entry.is_present() {
+                continue;
+            }
+
+            let pdpt_phys = pml4_entry.phys_addr().unwrap();
+            let pdpt_virt = hhdm::phys_to_virt(pdpt_phys);
+            let pdpt = unsafe { &*(pdpt_virt.as_u64() as *const PageTable) };
+
+            // 遍历PDPT
+            for pdpt_idx in 0..ENTRIES_PER_TABLE {
+                let pdpt_entry = pdpt.get_entry(pdpt_idx).unwrap();
+                if !pdpt_entry.is_present() {
+                    continue;
+                }
+
+                let pd_phys = pdpt_entry.phys_addr().unwrap();
+                let pd_virt = hhdm::phys_to_virt(pd_phys);
+                let pd = unsafe { &*(pd_virt.as_u64() as *const PageTable) };
+
+                // 遍历PD
+                for pd_idx in 0..ENTRIES_PER_TABLE {
+                    let pd_entry = pd.get_entry(pd_idx).unwrap();
+                    if !pd_entry.is_present() {
+                        continue;
+                    }
+
+                    let pt_phys = pd_entry.phys_addr().unwrap();
+                    
+                    // 释放PT
+                    free_frame(pt_phys);
+                }
+
+                // 释放PD
+                free_frame(pd_phys);
+            }
+
+            // 释放PDPT
+            free_frame(pdpt_phys);
+        }
+
+        // 释放PML4本身
+        free_frame(self.pml4_addr);
     }
 }
 
