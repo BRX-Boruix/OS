@@ -168,11 +168,10 @@ static void double_fault_handler(registers_t* regs) {
     print_string("#                              TERRIBLE KERNEL                                #\n");
     print_string("#                                                                             #\n");
     print_string("###############################################################################\n");
-    print_string("System halted.\n");
-    // 真正停止系统：禁用中断后进入死循环
-    // 不使用hlt，因为hlt会在下一个中断时唤醒CPU
+    
+    // 无限循环，等待重启
     while(1) {
-        __asm__ volatile("cli; pause");
+        __asm__ volatile("hlt");
     }
 }
 
@@ -211,11 +210,8 @@ void isr_handler(registers_t* regs) {
         print_string("========================================\n");
         
         print_string("System halted.\n");
-        
-        // 真正停止系统：禁用中断后进入死循环
-        // 不使用hlt，因为hlt会在下一个中断时唤醒CPU
         while(1) {
-            __asm__ volatile("cli; pause");
+            __asm__ volatile("hlt");
         }
     }
 }

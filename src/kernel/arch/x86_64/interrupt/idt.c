@@ -15,9 +15,6 @@ extern void isr24(), isr25(), isr26(), isr27(), isr28(), isr29(), isr30(), isr31
 extern void irq0(), irq1(), irq2(), irq3(), irq4(), irq5(), irq6(), irq7();
 extern void irq8(), irq9(), irq10(), irq11(), irq12(), irq13(), irq14(), irq15();
 
-// 系统调用入口
-extern void syscall_yield_entry(void);
-
 extern void idt_load(uint64_t);
 
 void idt_set_gate(uint8_t num, uint64_t handler) {
@@ -105,18 +102,7 @@ void idt_init(void) {
     idt_set_gate(46, (uint64_t)irq14);
     idt_set_gate(47, (uint64_t)irq15);
     
-    // 注册系统调用中断（INT 0x80 = 128）
-    idt_set_gate(0x80, (uint64_t)syscall_yield_entry);
-    
     idt_load((uint64_t)&idt_ptr);
     
     print_string("[IDT] Interrupt Descriptor Table initialized (x86_64)\n");
-    print_string("[IDT] System call interrupt (0x80) registered\n");
-}
-
-// 设置定时器中断处理程序（支持进程切换）
-void idt_set_timer_handler_with_switch(void) {
-    extern void irq_timer_with_switch(void);
-    idt_set_gate(32, (uint64_t)irq_timer_with_switch);
-    print_string("[IDT] Timer interrupt handler switched to process-switching mode\n");
 }

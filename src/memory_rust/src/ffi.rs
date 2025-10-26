@@ -429,7 +429,11 @@ pub extern "C" fn rust_alloc_pages(_count: usize) -> u64 {
 }
 
 /// 释放连续的物理页面
-// 已在文件末尾实现
+/// 阶段2: 空操作
+#[no_mangle]
+pub extern "C" fn rust_free_pages(_start_addr: u64, _count: usize) {
+    // 什么都不做
+}
 
 // ============================================================================
 // VMM (虚拟内存管理器) FFI 接口
@@ -772,97 +776,5 @@ pub extern "C" fn rust_get_page_flags(
             serial_log!("ERROR: Failed to get page protection");
             -1
         }
-    }
-}
-
-/// 为进程管理分配页面（返回虚拟地址）
-#[no_mangle]
-pub extern "C" fn rust_allocate_pages(count: usize) -> *mut u8 {
-    if count == 0 {
-        return ptr::null_mut();
-    }
-    
-    // 获取全局内存管理器实例
-    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
-        Some(m) => m,
-        None => {
-            serial_log!("ERROR: Memory manager not initialized");
-            return ptr::null_mut();
-        }
-    };
-    
-    use crate::lazy_buddy::PhysFrame;
-    
-    // 分配第一页
-    let first_frame = match manager.physical_allocator.allocate_frame() {
-        Some(frame) => frame,
-        None => {
-            serial_log!("ERROR: Failed to allocate first physical frame");
-            return ptr::null_mut();
-        }
-    };
-    
-    // 转换为虚拟地址（使用HHDM）
-    let first_virt_addr = hhdm::phys_to_virt(first_frame.addr());
-    
-    // 如果需要多页，继续分配
-    if count > 1 {
-        serial_log!("Allocating multiple pages");
-        
-        // 分配剩余的页面
-        for _i in 1..count {
-            match manager.physical_allocator.allocate_frame() {
-                Some(_frame) => {
-                    // 页面已分配，但我们只返回第一页的地址
-                    // 调用者需要确保这些页面是连续的虚拟地址
-                }
-                None => {
-                    serial_log!("ERROR: Failed to allocate additional page");
-                    // 清理已分配的页面
-                    // TODO: 实现清理逻辑
-                    return ptr::null_mut();
-                }
-            }
-        }
-    }
-    
-    first_virt_addr.as_u64() as *mut u8
-}
-
-/// 为进程管理释放页面（接受虚拟地址）
-#[no_mangle]
-pub extern "C" fn rust_free_pages(ptr: *mut u8, count: usize) {
-    if ptr.is_null() || count == 0 {
-        return;
-    }
-    
-    use crate::arch::addr::VirtAddr;
-    
-    // 获取全局内存管理器实例
-    let manager = match unsafe { crate::MEMORY_MANAGER.as_mut() } {
-        Some(m) => m,
-        None => {
-            serial_log!("ERROR: Memory manager not initialized");
-            return;
-        }
-    };
-    
-    // 将虚拟地址转换为物理地址
-    let virt_addr = VirtAddr::new(ptr as u64);
-    let phys_addr = match hhdm::virt_to_phys(virt_addr) {
-        Some(addr) => addr,
-        None => {
-            serial_log!("ERROR: Failed to convert virtual to physical address");
-            return;
-        }
-    };
-    let phys_frame = PhysFrame::from_start_address(phys_addr);
-    
-    // 释放物理页面
-    manager.physical_allocator.deallocate_frame(phys_frame);
-    
-    // TODO: 处理多页释放
-    if count > 1 {
-        serial_log!("WARNING: Multi-page deallocation not fully implemented");
     }
 }

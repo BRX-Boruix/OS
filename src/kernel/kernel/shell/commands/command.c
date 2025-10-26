@@ -7,15 +7,6 @@
 #include "kernel/shell.h"
 #include "drivers/display.h"
 
-// 进程管理命令声明
-void cmd_ps(int argc, char* argv[]);
-void cmd_schedstat(int argc, char* argv[]);
-void cmd_nice(int argc, char* argv[]);
-void cmd_kill(int argc, char** argv);
-void cmd_top(int argc, char** argv);
-void cmd_prio(int argc, char** argv);
-void cmd_switch(int argc, char** argv);
-
 // 测试命令声明（仅在 ENABLE_TEST_COMMANDS 定义时编译）
 #ifdef ENABLE_TEST_COMMANDS
 void cmd_memtest(int argc, char* argv[]);
@@ -43,13 +34,6 @@ static shell_command_t commands[] = {
     {"great", "Let the great Yang Borui give you the answer.", cmd_great},
     {"license", "Show license information for projects", cmd_license},
     {"keytest", "Test keyboard input and scancodes", cmd_keytest},
-    {"ps", "List all processes", cmd_ps},
-    {"schedstat", "Show scheduler statistics", cmd_schedstat},
-    {"nice", "Set process priority", cmd_nice},
-    {"kill", "Terminate a process", cmd_kill},
-    {"top", "Display system resource usage", cmd_top},
-    {"prio", "Set process priority", cmd_prio},
-    {"switch", "Switch between super/user mode", cmd_switch},
 #ifdef ENABLE_TEST_COMMANDS
     {"crash", "Manually trigger system crash", cmd_crash},
     {"dftest", "Test double fault handler", cmd_dftest},

@@ -3,14 +3,11 @@
 #include "kernel/kernel.h"
 #include "drivers/display.h"
 #include "drivers/cmos.h"
-#include "drivers/timer.h"
 #include "kernel/interrupt.h"
 #include "kernel/limine.h"
 #include "kernel/memory.h"
 #include "kernel/tty.h"
 #include "kernel/serial_debug.h"
-#include "kernel/process.h"
-#include "kernel/kthread.h"
 #include "arch/tss.h"
 #include "arch/gdt.h"
 
@@ -126,24 +123,18 @@ void kmain(void) {
     
     // 初始化TSS（双重错误需要）
     print_string("Initializing TSS (Task State Segment)...\n");
-    SERIAL_INFO("Calling tss_init()...");
     tss_init();
     print_string("TSS initialized!\n");
-    SERIAL_INFO("TSS initialized!");
     
     // 初始化GDT（包含TSS描述符）
     print_string("Initializing GDT (Global Descriptor Table)...\n");
-    SERIAL_INFO("Calling gdt_init()...");
     gdt_init();
     print_string("GDT initialized!\n");
-    SERIAL_INFO("GDT initialized!");
     
     // 初始化中断系统
     print_string("Initializing interrupt system...\n");
-    SERIAL_INFO("Calling interrupt_init()...");
     interrupt_init();
     print_string("Interrupt system ready!\n");
-    SERIAL_INFO("Interrupt system ready!");
     
     print_string("========================================\n");
     print_string("SYSTEM READY\n");
@@ -234,58 +225,48 @@ void kmain(void) {
     
     print_string("Rust memory management test completed\n");
     
-    // 初始化进程管理系统
-    print_string("\nInitializing process management system...\n");
-    int process_result = process_init();
-    if (process_result == 0) {
-        print_string("Process management initialized successfully!\n");
-        
-        // 启用调度器
-        scheduler_enable();
-        
-        // 通知定时器调度器已初始化
-        timer_set_scheduler_initialized(true);
-        
-        print_string("Process scheduler enabled!\n");
-    } else {
-        print_string("Failed to initialize process management\n");
-    }
-    
-    // 初始化TTY系统（不测试输出）
-    print_string("Initializing TTY system...\n");
+    // 测试TTY系统
+    print_string("Testing TTY system...\n");
     tty_init();
-    print_string("TTY system initialized\n");
+    print_string("TTY system test completed\n");
+    
+    // 测试TTY输出功能
+    print_string("Testing TTY output functions...\n");
+    kprint("This is a test of kprint function\n");
+    kprintf("This is a test of kprintf: %d\n", 42);
+    kinfo("This is an info message\n");
+    kdebug("This is a debug message\n");
+    print_string("TTY output test completed\n");
+    
+    // 测试页面分配（阶段2）
+    print_string("Testing page allocation...\n");
+    uint64_t page1 = alloc_page();
+    uint64_t page2 = alloc_page();
+    
+    if (page1 && page2) {
+        print_string("Page allocation: SUCCESS\n");
+        print_string("Page 1: 0x");
+        print_hex(page1);
+        print_string("\nPage 2: 0x");
+        print_hex(page2);
+        print_string("\n");
+        
+        free_page(page1);
+        free_page(page2);
+        print_string("Page deallocation: SUCCESS\n");
+    } else {
+        print_string("Page allocation: FAILED\n");
+        if (!page1) print_string("  Page 1 returned 0\n");
+        if (!page2) print_string("  Page 2 returned 0\n");
+    }
     
     print_string("========================================\n");
-    print_string("Starting Init Process...\n");
+    print_string("Starting Shell...\n");
     print_string("========================================\n\n");
     
-    // 启动init进程（它会启动shell和其他系统进程）
-    extern pid_t start_init_process(void);
-    pid_t init_pid = start_init_process();
+    // 启动shell
+    extern void shell_main(void);
+    shell_main();
     
-    if (init_pid == INVALID_PID) {
-        print_string("CRITICAL: Failed to start init process\n");
-        print_string("System halted\n");
-        hcf();
-    }
-    
-    print_string("[KERNEL] Init process created, switching to it...\n");
-    
-    // 启用抢占式调度（在切换到第一个进程之前）
-    print_string("[KERNEL] Setting up preemptive scheduling...\n");
-    idt_set_timer_handler_with_switch();
-    enable_process_switching();
-    
-    // 切换到第一个进程（init进程）
-    print_string("[KERNEL] Switching to init process...\n");
-    SERIAL_INFO("About to switch to first process...");
-    
-    // 这个函数不会返回
-    extern void switch_to_first_process(uint32_t pid);
-    switch_to_first_process(init_pid);
-    
-    // 永远不应该到达这里
-    print_string("[KERNEL] ERROR: Returned from first process switch!\n");
     hcf();
 }
