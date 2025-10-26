@@ -2,8 +2,10 @@
 //! 实现页面分配功能
 
 use crate::arch::{MemoryRegion, MemoryType};
+use crate::arch::addr::PhysAddr;
 use crate::hhdm;
 use crate::lazy_buddy::PhysFrame;
+use crate::paging::PageTableManager;
 use crate::MemoryManager;
 use core::ptr;
 use core::slice;
@@ -865,4 +867,64 @@ pub extern "C" fn rust_free_pages(ptr: *mut u8, count: usize) {
     if count > 1 {
         serial_log!("WARNING: Multi-page deallocation not fully implemented");
     }
+}
+
+/// 为进程创建新的页表(复制内核映射)
+/// 返回CR3值(页表物理地址)，失败返回0
+#[no_mangle]
+pub extern "C" fn rust_create_process_page_table() -> u64 {
+    let manager = MemoryManager::instance();
+    
+    // 从当前CR3创建页表管理器（这样能获取最新的内核映射）
+    let current_ptm = match PageTableManager::from_current() {
+        Ok(ptm) => ptm,
+        Err(e) => {
+            serial_log!("ERROR: Failed to get current page table");
+            unsafe {
+                serial_puts(b"[RUST] Error: \0".as_ptr());
+                serial_puts(e.as_ptr());
+                serial_puts(b"\n\0".as_ptr());
+            }
+            return 0;
+        }
+    };
+    
+    // 创建新页表(复制内核映射)
+    let new_ptm = match current_ptm.clone_kernel_mappings(|| {
+        manager.physical_allocator.allocate_frame()
+    }) {
+        Ok(ptm) => ptm,
+        Err(e) => {
+            serial_log!("ERROR: Failed to create process page table");
+            unsafe {
+                serial_puts(b"[RUST] Error: \0".as_ptr());
+                serial_puts(e.as_ptr());
+                serial_puts(b"\n\0".as_ptr());
+            }
+            return 0;
+        }
+    };
+    
+    // 返回CR3值
+    new_ptm.pml4_addr().as_u64()
+}
+
+/// 释放进程页表
+/// cr3: 页表物理地址
+#[no_mangle]
+pub extern "C" fn rust_free_process_page_table(cr3: u64) {
+    if cr3 == 0 {
+        return;
+    }
+    
+    let manager = MemoryManager::instance();
+    
+    // 创建临时页表管理器
+    let ptm = PageTableManager::from_phys_addr(PhysAddr::new(cr3));
+    
+    // 释放页表(只释放用户空间)
+    ptm.free_process_page_tables(|phys_addr| {
+        let frame = PhysFrame::from_start_address(phys_addr);
+        manager.physical_allocator.deallocate_frame(frame);
+    });
 }

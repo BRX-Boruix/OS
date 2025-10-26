@@ -21,4 +21,8 @@
 #include "crash/crash.h"
 #include "license/license.h"
 
+#ifdef ENABLE_TEST_COMMANDS
+#include "vmtest/vmtest.h"
+#endif
+
 #endif // BUILTIN_H
