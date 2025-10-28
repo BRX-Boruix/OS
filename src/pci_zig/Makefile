@@ -16,10 +16,10 @@ ZIG_FLAGS = -target x86_64-freestanding-none \
 
 all: $(TARGET_LIB)
 
-$(TARGET_OBJ): src/pci.zig
-	@echo "Building PCI driver object with Zig..."
+$(TARGET_OBJ): src/pci_v2.zig src/acpi.zig
+	@echo "Building PCI driver V2 object with Zig..."
 	@mkdir -p $(BUILD_DIR)
-	@$(ZIG) build-obj src/pci.zig $(ZIG_FLAGS) -femit-bin=$(TARGET_OBJ)
+	@$(ZIG) build-obj src/pci_v2.zig $(ZIG_FLAGS) -femit-bin=$(TARGET_OBJ)
 
 $(TARGET_LIB): $(TARGET_OBJ)
 	@echo "Creating PCI library archive..."
@@ -40,7 +40,7 @@ install: $(TARGET_LIB)
 
 # 检查Zig代码
 check:
-	@$(ZIG) build-lib src/pci.zig $(ZIG_FLAGS) -femit-llvm-ir=$(BUILD_DIR)/pci.ll
+	@$(ZIG) build-lib src/pci_v2.zig $(ZIG_FLAGS) -femit-llvm-ir=$(BUILD_DIR)/pci.ll
 
 # 格式化代码
 fmt:
