@@ -5,6 +5,7 @@
 #include "../builtin/builtin.h"
 #include "../builtin/keytest/keytest.h"
 #include "../builtin/lspci/lspci.h"
+#include "../builtin/test_pci/test_pci.h"
 #include "kernel/shell.h"
 #include "drivers/display.h"
 
@@ -30,18 +31,19 @@ static shell_command_t commands[] = {
     {"irqstat", "Show interrupt statistics", cmd_irqstat},
     {"irqinfo", "Show IRQ configuration", cmd_irqinfo},
     {"irqprio", "Manage IRQ priorities", cmd_irqprio},
-    {"irqtest", "Test IRQ priority system", cmd_irqtest},
     {"reboot", "Reboot system", cmd_reboot},
     {"great", "Let the great Yang Borui give you the answer.", cmd_great},
     {"license", "Show license information for projects", cmd_license},
-    {"keytest", "Test keyboard input and scancodes", cmd_keytest},
     {"lspci", "List all PCI devices", cmd_lspci},
 #ifdef ENABLE_TEST_COMMANDS
     {"crash", "Manually trigger system crash", cmd_crash},
     {"dftest", "Test double fault handler", cmd_dftest},
     {"pgtest", "Test page table mapping and translation", cmd_pgtest},
+    {"irqtest", "Test IRQ priority system", cmd_irqtest},
     {"vmmtest", "Test virtual memory manager", cmd_vmmtest},
     {"heaptest", "Test heap allocator (kmalloc/kfree)", cmd_heaptest},
+    {"keytest", "Test keyboard input and scancodes", cmd_keytest},
+    {"test_pci", "Test PCI driver functionality", cmd_test_pci},
     {"memprottest", "Test memory protection mechanism", cmd_memprottest},
     {"memtest", "Test TTY memory management and page tables", cmd_memtest},
     {"test", "Test command", cmd_test},

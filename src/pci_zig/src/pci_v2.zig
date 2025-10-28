@@ -228,17 +228,27 @@ var pci_mode: PCIMode = PCIMode.Legacy;
 var mcfg_table: ?*acpi.MCFG = null;
 var mcfg_entry_count: u32 = 0;
 
-fn find_mcfg_entry_for_bus(bus: u8) ?*acpi.MCFGEntry {
+// Segment支持：为每个Segment存储ECAM基地址
+var mcfg_entries: [8]*acpi.MCFGEntry = undefined;  // 最多8个Segment
+var segment_count: u32 = 0;
+
+fn find_mcfg_entry_for_bus_segment(bus: u8, segment: u16) ?*acpi.MCFGEntry {
     const mcfg = mcfg_table orelse return null;
     
     var i: u32 = 0;
     while (i < mcfg_entry_count) : (i += 1) {
         const entry = acpi.get_mcfg_entry(mcfg, i) orelse continue;
-        if (bus >= entry.start_bus and bus <= entry.end_bus) {
+        // 匹配segment和bus范围
+        if (entry.segment == segment and bus >= entry.start_bus and bus <= entry.end_bus) {
             return entry;
         }
     }
     return null;
+}
+
+// 向后兼容：默认使用segment 0
+fn find_mcfg_entry_for_bus(bus: u8) ?*acpi.MCFGEntry {
+    return find_mcfg_entry_for_bus_segment(bus, 0);
 }
 
 pub fn pci_config_read_dword(addr: PCIAddress, offset: u8) u32 {
@@ -293,8 +303,65 @@ pub fn pci_is_multifunction(addr: PCIAddress) bool {
 }
 
 // ============================================================================
-// BAR解析
+// BAR解析和大小计算
 // ============================================================================
+
+/// 计算BAR大小（通过-1探测）
+fn calculate_bar_size(addr: PCIAddress, bar_offset: u8, bar_type: BARType) u64 {
+    // 保存原始值
+    const original_value = pci_config_read_dword(addr, bar_offset);
+    
+    // 写入-1（全1）到BAR
+    pci_config_write_dword(addr, bar_offset, 0xFFFFFFFF);
+    
+    // 读取探测结果
+    const probe_value = pci_config_read_dword(addr, bar_offset);
+    
+    // 恢复原始值
+    pci_config_write_dword(addr, bar_offset, original_value);
+    
+    // 计算大小
+    // 对于IO BAR: mask = 0xFFFFFFFC（最低2位是标志）
+    // 对于Memory BAR: mask = 0xFFFFFFF0（最低4位是标志）
+    
+    if (bar_type == BARType.IO) {
+        const mask = probe_value & 0xFFFFFFFC;
+        if (mask == 0) return 0;
+        return (~mask +% 1) & 0xFFFFFFFF;
+    } else {
+        const mask = probe_value & 0xFFFFFFF0;
+        if (mask == 0) return 0;
+        return (~mask +% 1) & 0xFFFFFFFF;
+    }
+}
+
+/// 计算64位BAR大小（两个32位寄存器）
+fn calculate_bar_size_64(addr: PCIAddress, bar_offset: u8) u64 {
+    // 保存原始值
+    const original_low = pci_config_read_dword(addr, bar_offset);
+    const original_high = pci_config_read_dword(addr, bar_offset + 4);
+    
+    // 写入-1到两个32位寄存器
+    pci_config_write_dword(addr, bar_offset, 0xFFFFFFFF);
+    pci_config_write_dword(addr, bar_offset + 4, 0xFFFFFFFF);
+    
+    // 读取探测结果
+    const probe_low = pci_config_read_dword(addr, bar_offset);
+    const probe_high = pci_config_read_dword(addr, bar_offset + 4);
+    
+    // 恢复原始值
+    pci_config_write_dword(addr, bar_offset, original_low);
+    pci_config_write_dword(addr, bar_offset + 4, original_high);
+    
+    // 计算大小：mask = probe值 & 0xFFFFFFF0（低位是标志）
+    const mask_low = probe_low & 0xFFFFFFF0;
+    const mask_high = probe_high;
+    
+    if (mask_low == 0 and mask_high == 0) return 0;
+    
+    const mask: u64 = (@as(u64, mask_high) << 32) | mask_low;
+    return (~mask +% 1);
+}
 
 fn parse_bar(addr: PCIAddress, bar_index: u8) ?BAR {
     if (bar_index >= 6) return null;
@@ -309,10 +376,11 @@ fn parse_bar(addr: PCIAddress, bar_index: u8) ?BAR {
     
     if (is_io) {
         // IO空间BAR
+        const size = calculate_bar_size(addr, bar_offset, BARType.IO);
         return BAR{
             .bar_type = BARType.IO,
             .address = bar_value & 0xFFFFFFFC,
-            .size = 0,  // 需要额外计算
+            .size = size,
             .prefetchable = false,
         };
     } else {
@@ -322,10 +390,11 @@ fn parse_bar(addr: PCIAddress, bar_index: u8) ?BAR {
         
         if (bar_type_bits == 0) {
             // 32位地址
+            const size = calculate_bar_size(addr, bar_offset, BARType.Memory32);
             return BAR{
                 .bar_type = BARType.Memory32,
                 .address = bar_value & 0xFFFFFFF0,
-                .size = 0,
+                .size = size,
                 .prefetchable = prefetchable,
             };
         } else if (bar_type_bits == 2) {
@@ -334,11 +403,12 @@ fn parse_bar(addr: PCIAddress, bar_index: u8) ?BAR {
             
             const bar_high = pci_config_read_dword(addr, bar_offset + 4);
             const address = (@as(u64, bar_high) << 32) | (bar_value & 0xFFFFFFF0);
+            const size = calculate_bar_size_64(addr, bar_offset);
             
             return BAR{
                 .bar_type = BARType.Memory64,
                 .address = address,
-                .size = 0,
+                .size = size,
                 .prefetchable = prefetchable,
             };
         }
@@ -556,6 +626,8 @@ export fn pci_init() void {
         serial_print_hex(mcfg_entry_count);
         serial_print(" entries\n");
         
+        // 收集所有Segment信息
+        segment_count = 0;
         var i: u32 = 0;
         while (i < mcfg_entry_count) : (i += 1) {
             if (acpi.get_mcfg_entry(mcfg, i)) |entry| {
@@ -563,11 +635,18 @@ export fn pci_init() void {
                 serial_print_hex(i);
                 serial_print("] base=");
                 serial_print_hex(entry.base_addr);
+                serial_print(" segment=");
+                serial_print_hex(entry.segment);
                 serial_print(" bus=");
                 serial_print_hex(entry.start_bus);
                 serial_print("-");
                 serial_print_hex(entry.end_bus);
                 serial_print("\n");
+                
+                if (segment_count < 8) {
+                    mcfg_entries[segment_count] = entry;
+                    segment_count += 1;
+                }
             }
         }
     } else {
@@ -638,6 +717,11 @@ export fn pci_get_device_count() usize {
     return device_count;
 }
 
+/// 获取PCI Segment数量（多Segment支持）
+export fn pci_get_segment_count() u32 {
+    return segment_count;
+}
+
 export fn pci_get_device(index: usize, out_device: *PCIDeviceC) bool {
     if (index >= device_count) return false;
 
@@ -691,6 +775,37 @@ export fn pci_get_bar(index: usize, bar_idx: u8, out_addr: *u64, out_size: *u64)
     if (dev.bars[bar_idx]) |bar| {
         out_addr.* = bar.address;
         out_size.* = bar.size;
+        return true;
+    }
+    return false;
+}
+
+// C结构体定义：BAR信息（与C头文件对应）
+pub const PCI_BAR_C = extern struct {
+    address: u64,
+    size: u64,
+    bar_type: u8,      // 0=Mem32, 2=Mem64, 3=IO
+    prefetchable: u8,
+};
+
+/// 获取完整BAR信息（含类型和标志）
+export fn pci_get_bar_info(device_index: usize, bar_index: u8, out_bar: *PCI_BAR_C) bool {
+    if (device_index >= device_count or bar_index >= 6) return false;
+    
+    const dev = &device_list[device_index];
+    if (dev.bars[bar_index]) |bar| {
+        out_bar.address = bar.address;
+        out_bar.size = bar.size;
+        
+        // 转换BAR类型为C值
+        out_bar.bar_type = switch (bar.bar_type) {
+            BARType.IO => 3,
+            BARType.Memory32 => 0,
+            BARType.Memory64 => 2,
+            else => 0xFF,
+        };
+        
+        out_bar.prefetchable = if (bar.prefetchable) 1 else 0;
         return true;
     }
     return false;

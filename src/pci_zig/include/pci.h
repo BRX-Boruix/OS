@@ -30,11 +30,29 @@ typedef struct {
     uint8_t  header_type;  // 头部类型
 } pci_device_t;
 
+// BAR类型枚举
+typedef enum {
+    PCI_BAR_IO = 3,          // IO空间
+    PCI_BAR_MEM32 = 0,       // 32位内存
+    PCI_BAR_MEM64 = 2,       // 64位内存
+} pci_bar_type_t;
+
+// BAR信息结构
+typedef struct {
+    uint64_t address;        // BAR基地址
+    uint64_t size;           // BAR大小
+    uint8_t  type;           // BAR类型 (见 pci_bar_type_t)
+    uint8_t  prefetchable;   // 是否可预取（仅内存BAR）
+} pci_bar_info_t;
+
 // 初始化PCI驱动并扫描所有设备
 void pci_init(void);
 
 // 获取扫描到的设备数量
 size_t pci_get_device_count(void);
+
+// 获取PCI Segment数量（支持多Segment系统）
+uint32_t pci_get_segment_count(void);
 
 // 获取指定索引的设备信息
 // 返回: true表示成功，false表示索引无效
@@ -52,6 +70,16 @@ uint32_t pci_read_config_dword(uint8_t bus, uint8_t device, uint8_t function, ui
 
 // 写入PCI配置空间（32位）
 void pci_write_config_dword(uint8_t bus, uint8_t device, uint8_t function, uint8_t offset, uint32_t value);
+
+// 获取PCI模式（0=Legacy, 1=MCFG）
+uint8_t pci_get_mode(void);
+
+// 获取设备BAR信息（包含大小）
+bool pci_get_bar(size_t index, uint8_t bar_idx, uint64_t* out_addr, uint64_t* out_size);
+
+// 获取设备完整BAR信息（包括类型和标志）
+// 返回: true表示该BAR有效，false表示无效或超出范围
+bool pci_get_bar_info(size_t device_index, uint8_t bar_index, pci_bar_info_t* out_bar);
 
 #ifdef __cplusplus
 }
