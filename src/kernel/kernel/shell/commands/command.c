@@ -6,6 +6,7 @@
 #include "../builtin/keytest/keytest.h"
 #include "../builtin/lspci/lspci.h"
 #include "../builtin/test_pci/test_pci.h"
+#include "../builtin/pci_info/pci_info.h"
 #include "kernel/shell.h"
 #include "drivers/display.h"
 
@@ -35,6 +36,7 @@ static shell_command_t commands[] = {
     {"great", "Let the great Yang Borui give you the answer.", cmd_great},
     {"license", "Show license information for projects", cmd_license},
     {"lspci", "List all PCI devices", cmd_lspci},
+    {"pci_info", "Show detailed PCI device information", cmd_pci_info},
 #ifdef ENABLE_TEST_COMMANDS
     {"crash", "Manually trigger system crash", cmd_crash},
     {"dftest", "Test double fault handler", cmd_dftest},
@@ -43,7 +45,9 @@ static shell_command_t commands[] = {
     {"vmmtest", "Test virtual memory manager", cmd_vmmtest},
     {"heaptest", "Test heap allocator (kmalloc/kfree)", cmd_heaptest},
     {"keytest", "Test keyboard input and scancodes", cmd_keytest},
+    {"lspci", "List all PCI devices", cmd_lspci},
     {"test_pci", "Test PCI driver functionality", cmd_test_pci},
+    {"pci_info", "Show detailed PCI device information", cmd_pci_info},
     {"memprottest", "Test memory protection mechanism", cmd_memprottest},
     {"memtest", "Test TTY memory management and page tables", cmd_memtest},
     {"test", "Test command", cmd_test},

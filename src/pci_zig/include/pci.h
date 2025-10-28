@@ -18,16 +18,20 @@ extern uint64_t rust_get_hhdm_offset(void);
 
 // PCI设备信息结构（与Zig中的PCIDeviceC对应）
 typedef struct {
-    uint8_t  bus;          // 总线号
-    uint8_t  device;       // 设备号
-    uint8_t  function;     // 功能号
-    uint16_t vendor_id;    // 厂商ID
-    uint16_t device_id;    // 设备ID
-    uint8_t  class_code;   // 类别码
-    uint8_t  subclass;     // 子类别
-    uint8_t  prog_if;      // 编程接口
-    uint8_t  revision;     // 版本ID
-    uint8_t  header_type;  // 头部类型
+    uint8_t  bus;                    // 总线号
+    uint8_t  device;                 // 设备号
+    uint8_t  function;               // 功能号
+    uint16_t vendor_id;              // 厂商ID
+    uint16_t device_id;              // 设备ID
+    uint8_t  class_code;             // 类别码
+    uint8_t  subclass;               // 子类别
+    uint8_t  prog_if;                // 编程接口
+    uint8_t  revision;               // 版本ID
+    uint8_t  header_type;            // 头部类型
+    uint16_t subsystem_vendor_id;    // 子系统厂商ID（新增）
+    uint16_t subsystem_device_id;    // 子系统设备ID（新增）
+    uint8_t  interrupt_line;         // 中断号（新增）
+    uint8_t  interrupt_pin;          // 中断脚（新增）
 } pci_device_t;
 
 // BAR类型枚举
@@ -80,6 +84,16 @@ bool pci_get_bar(size_t index, uint8_t bar_idx, uint64_t* out_addr, uint64_t* ou
 // 获取设备完整BAR信息（包括类型和标志）
 // 返回: true表示该BAR有效，false表示无效或超出范围
 bool pci_get_bar_info(size_t device_index, uint8_t bar_index, pci_bar_info_t* out_bar);
+
+// 获取设备的子系统信息（新增）
+// 返回: true表示成功，false表示索引无效
+bool pci_get_subsystem_info(size_t device_index, uint16_t* out_vendor_id, uint16_t* out_device_id);
+
+// 获取设备的中断信息（新增）
+// 返回: true表示成功，false表示索引无效
+// out_line: 中断号（0=无中断）
+// out_pin: 中断脚（1=INTA, 2=INTB, 3=INTC, 4=INTD, 0=无）
+bool pci_get_interrupt_info(size_t device_index, uint8_t* out_interrupt_line, uint8_t* out_interrupt_pin);
 
 #ifdef __cplusplus
 }

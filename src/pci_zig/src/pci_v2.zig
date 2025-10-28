@@ -28,6 +28,12 @@ pub const PCI_CONF_BAR3: u8 = 0x1C;
 pub const PCI_CONF_BAR4: u8 = 0x20;
 pub const PCI_CONF_BAR5: u8 = 0x24;
 
+// 新增：子系统和中断相关偏移
+pub const PCI_CONF_SUBSYSTEM_VENDOR: u8 = 0x2C;  // Subsystem Vendor ID (16位)
+pub const PCI_CONF_SUBSYSTEM_DEVICE: u8 = 0x2E;  // Subsystem Device ID (16位)
+pub const PCI_CONF_INTERRUPT_LINE: u8 = 0x3C;    // Interrupt Line (8位)
+pub const PCI_CONF_INTERRUPT_PIN: u8 = 0x3D;     // Interrupt Pin (8位)
+
 pub const MAX_BUS: u16 = 256;
 pub const MAX_DEVICE: u8 = 32;
 pub const MAX_FUNCTION: u8 = 8;
@@ -73,6 +79,12 @@ pub const PCIDevice = struct {
     header_type: u8,
     bars: [6]?BAR,  // 最多6个BAR
     ecam_base: ?u64 = null,  // ECAM基地址（MCFG模式）
+    
+    // 新增：子系统和中断信息
+    subsystem_vendor_id: u16 = 0,
+    subsystem_device_id: u16 = 0,
+    interrupt_line: u8 = 0,       // IRQ号
+    interrupt_pin: u8 = 0,        // 中断脚（1=INTA, 2=INTB, 3=INTC, 4=INTD）
 };
 
 pub const DeviceClass = struct {
@@ -286,6 +298,106 @@ pub fn pci_config_read_byte(addr: PCIAddress, offset: u8) u8 {
         }
     }
     return pci_legacy_read_byte(addr, offset);
+}
+
+// ============================================================================
+// PCI Capability支持
+// ============================================================================
+
+pub const PCI_CAP_POINTER: u8 = 0x34;  // Capability指针（8位）
+
+pub const PCI_STATUS_CAP_LIST: u16 = 0x0010;  // 支持Capability列表
+
+// Capability ID定义
+pub const CAP_ID_MSI: u8 = 0x05;           // Message Signaled Interrupts
+pub const CAP_ID_MSIX: u8 = 0x11;          // MSI-X
+pub const CAP_ID_PM: u8 = 0x01;            // Power Management
+pub const CAP_ID_VPD: u8 = 0x03;           // Vital Product Data
+pub const CAP_ID_SLOTID: u8 = 0x04;        // Slot Identification
+pub const CAP_ID_PCIE: u8 = 0x10;          // PCI Express
+pub const CAP_ID_PCIX: u8 = 0x07;          // PCI-X
+pub const CAP_ID_HT: u8 = 0x08;            // HyperTransport
+pub const CAP_ID_VENDOR: u8 = 0x09;        // Vendor Specific
+pub const CAP_ID_DEBUG: u8 = 0x0A;         // Debug Port
+pub const CAP_ID_CPCI_HOTSWAP: u8 = 0x0C; // CompactPCI Hot Swap
+pub const CAP_ID_SHPC: u8 = 0x0C;          // Standard Hot Plug Controller
+pub const CAP_ID_SSVID: u8 = 0x0D;         // Subsystem Vendor ID
+
+pub const Capability = struct {
+    id: u8,                    // Capability ID
+    offset: u8,                // 配置空间偏移
+    next_offset: u8,           // 下一个Capability的偏移
+};
+
+// 最多支持16个Capability
+pub const MAX_CAPABILITIES: usize = 16;
+
+pub const CapabilityList = struct {
+    capabilities: [MAX_CAPABILITIES]?Capability = [_]?Capability{null} ** MAX_CAPABILITIES,
+    count: usize = 0,
+    
+    pub fn has_msi(self: *const CapabilityList) bool {
+        return self.find(CAP_ID_MSI) != null;
+    }
+    
+    pub fn has_msix(self: *const CapabilityList) bool {
+        return self.find(CAP_ID_MSIX) != null;
+    }
+    
+    pub fn has_pcie(self: *const CapabilityList) bool {
+        return self.find(CAP_ID_PCIE) != null;
+    }
+    
+    pub fn find(self: *const CapabilityList, cap_id: u8) ?*const Capability {
+        for (self.capabilities) |cap_opt| {
+            if (cap_opt) |cap| {
+                if (cap.id == cap_id) {
+                    return &cap;
+                }
+            }
+        }
+        return null;
+    }
+};
+
+/// 扫描设备的Capability列表
+pub fn scan_capabilities(addr: PCIAddress) CapabilityList {
+    var cap_list = CapabilityList{};
+    
+    // 检查设备是否支持Capability列表
+    const status = pci_config_read_word(addr, PCI_CONF_STATUS);
+    if ((status & PCI_STATUS_CAP_LIST) == 0) {
+        return cap_list;  // 不支持Capability列表
+    }
+    
+    // 获取第一个Capability指针
+    var cap_offset = pci_config_read_byte(addr, PCI_CAP_POINTER) & 0xFC;
+    
+    // 遍历Capability链表
+    var visited_count: u32 = 0;
+    while (cap_offset != 0 and visited_count < 32) : (visited_count += 1) {
+        // 防止无限循环
+        if (cap_offset < 0x40) break;  // Capability必须在0x40之后
+        
+        // 读取Capability ID和下一个指针
+        const cap_header = pci_config_read_byte(addr, cap_offset);
+        const cap_id = cap_header;
+        const next_offset = pci_config_read_byte(addr, cap_offset + 1) & 0xFC;
+        
+        if (cap_list.count < MAX_CAPABILITIES) {
+            cap_list.capabilities[cap_list.count] = Capability{
+                .id = cap_id,
+                .offset = cap_offset,
+                .next_offset = next_offset,
+            };
+            cap_list.count += 1;
+        }
+        
+        cap_offset = next_offset;
+        if (cap_offset == 0) break;  // 链表结束
+    }
+    
+    return cap_list;
 }
 
 // ============================================================================
@@ -586,6 +698,15 @@ pub fn pci_read_device(addr: PCIAddress) PCIDevice {
         ecam_base = entry.base_addr;
     }
 
+    // 读取子系统ID
+    const subsystem_info = pci_config_read_dword(addr, PCI_CONF_SUBSYSTEM_VENDOR);
+    const subsystem_vendor_id = @as(u16, @truncate(subsystem_info));
+    const subsystem_device_id = @as(u16, @truncate(subsystem_info >> 16));
+
+    // 读取中断信息
+    const interrupt_line = pci_config_read_byte(addr, PCI_CONF_INTERRUPT_LINE);
+    const interrupt_pin = pci_config_read_byte(addr, PCI_CONF_INTERRUPT_PIN);
+
     return PCIDevice{
         .address = addr,
         .vendor_id = vendor_id,
@@ -597,6 +718,10 @@ pub fn pci_read_device(addr: PCIAddress) PCIDevice {
         .header_type = header_type & 0x7F,
         .bars = bars,
         .ecam_base = ecam_base,
+        .subsystem_vendor_id = subsystem_vendor_id,
+        .subsystem_device_id = subsystem_device_id,
+        .interrupt_line = interrupt_line,
+        .interrupt_pin = interrupt_pin,
     };
 }
 
@@ -711,6 +836,10 @@ pub const PCIDeviceC = extern struct {
     prog_if: u8,
     revision: u8,
     header_type: u8,
+    subsystem_vendor_id: u16,
+    subsystem_device_id: u16,
+    interrupt_line: u8,
+    interrupt_pin: u8,
 };
 
 export fn pci_get_device_count() usize {
@@ -736,6 +865,10 @@ export fn pci_get_device(index: usize, out_device: *PCIDeviceC) bool {
     out_device.prog_if = dev.prog_if;
     out_device.revision = dev.revision;
     out_device.header_type = dev.header_type;
+    out_device.subsystem_vendor_id = dev.subsystem_vendor_id;
+    out_device.subsystem_device_id = dev.subsystem_device_id;
+    out_device.interrupt_line = dev.interrupt_line;
+    out_device.interrupt_pin = dev.interrupt_pin;
     return true;
 }
 
@@ -809,5 +942,25 @@ export fn pci_get_bar_info(device_index: usize, bar_index: u8, out_bar: *PCI_BAR
         return true;
     }
     return false;
+}
+
+/// 获取设备的子系统信息
+export fn pci_get_subsystem_info(device_index: usize, out_vendor: *u16, out_device: *u16) bool {
+    if (device_index >= device_count) return false;
+    
+    const dev = &device_list[device_index];
+    out_vendor.* = dev.subsystem_vendor_id;
+    out_device.* = dev.subsystem_device_id;
+    return true;
+}
+
+/// 获取设备的中断信息
+export fn pci_get_interrupt_info(device_index: usize, out_line: *u8, out_pin: *u8) bool {
+    if (device_index >= device_count) return false;
+    
+    const dev = &device_list[device_index];
+    out_line.* = dev.interrupt_line;
+    out_pin.* = dev.interrupt_pin;
+    return true;
 }
 
