@@ -95,6 +95,36 @@ bool pci_get_subsystem_info(size_t device_index, uint16_t* out_vendor_id, uint16
 // out_pin: 中断脚（1=INTA, 2=INTB, 3=INTC, 4=INTD, 0=无）
 bool pci_get_interrupt_info(size_t device_index, uint8_t* out_interrupt_line, uint8_t* out_interrupt_pin);
 
+// ============================================================================
+// 设备过滤和查询API（新增）
+// ============================================================================
+
+// 按Vendor ID查找设备
+// 返回: 找到的设备数量
+// out_indices: 指向结果数组的指针，用于存储设备索引
+// max_count: 最多返回的设备数量
+size_t pci_find_by_vendor(uint16_t vendor_id, size_t* out_indices, size_t max_count);
+
+// 按Device ID查找设备
+// 返回: 找到的设备数量
+size_t pci_find_by_device(uint16_t device_id, size_t* out_indices, size_t max_count);
+
+// 按Vendor和Device ID同时查找（精确匹配）
+// 返回: 找到的设备数量
+size_t pci_find_by_vendor_and_device(uint16_t vendor_id, uint16_t device_id, size_t* out_indices, size_t max_count);
+
+// 按Class Code查找设备
+// 返回: 找到的设备数量
+size_t pci_find_by_class(uint8_t class_code, size_t* out_indices, size_t max_count);
+
+// 按Class和SubClass查找设备
+// 返回: 找到的设备数量
+size_t pci_find_by_class_and_subclass(uint8_t class_code, uint8_t subclass, size_t* out_indices, size_t max_count);
+
+// 按Bus号查找设备
+// 返回: 找到的设备数量
+size_t pci_find_by_bus(uint8_t bus, size_t* out_indices, size_t max_count);
+
 #ifdef __cplusplus
 }
 #endif

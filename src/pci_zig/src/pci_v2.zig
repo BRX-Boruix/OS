@@ -282,6 +282,17 @@ pub fn pci_config_write_dword(addr: PCIAddress, offset: u8, value: u32) void {
     pci_legacy_write_dword(addr, offset, value);
 }
 
+pub fn pci_config_write_word(addr: PCIAddress, offset: u8, value: u16) void {
+    const dword_offset = offset & 0xFC;
+    const byte_offset = offset & 0x03;
+    const shift = @as(u5, @intCast(byte_offset * 8));
+    
+    var dword = pci_config_read_dword(addr, dword_offset);
+    const mask: u32 = 0xFFFF << shift;
+    dword = (dword & ~mask) | (@as(u32, value) << shift);
+    pci_config_write_dword(addr, dword_offset, dword);
+}
+
 pub fn pci_config_read_word(addr: PCIAddress, offset: u8) u16 {
     if (pci_mode == PCIMode.MCFG) {
         if (find_mcfg_entry_for_bus(addr.bus)) |entry| {
@@ -359,6 +370,77 @@ pub const CapabilityList = struct {
         return null;
     }
 };
+
+// ============================================================================
+// MSI支持
+// ============================================================================
+
+pub const MSICapability = struct {
+    offset: u8,                 // MSI Capability在配置空间的偏移
+    control: u16,              // Message Control寄存器
+    is_64bit: bool,            // 是否支持64位地址
+    multiple_messages: u8,      // 支持的消息数（2^N）
+    enabled: bool,              // 是否启用
+};
+
+// MSI Control寄存器位定义
+pub const MSI_CONTROL_ENABLE: u16 = 0x0001;           // MSI启用
+pub const MSI_CONTROL_MULTI_MSG_CAPABLE: u16 = 0x000E; // 支持的消息数(bits 3-1)
+pub const MSI_CONTROL_MULTI_MSG_ENABLED: u16 = 0x0070; // 启用的消息数(bits 6-4)
+pub const MSI_CONTROL_64BIT: u16 = 0x0080;            // 64位地址支持
+
+/// 读取MSI Capability信息
+pub fn read_msi_capability(addr: PCIAddress, cap_offset: u8) ?MSICapability {
+    // 读取MSI Control寄存器
+    const control = pci_config_read_word(addr, cap_offset + 2);
+    
+    // 提取信息
+    const is_64bit = (control & MSI_CONTROL_64BIT) != 0;
+    const multiple_msg_capable = @as(u8, @truncate((control & MSI_CONTROL_MULTI_MSG_CAPABLE) >> 1));
+    const enabled = (control & MSI_CONTROL_ENABLE) != 0;
+    
+    return MSICapability{
+        .offset = cap_offset,
+        .control = control,
+        .is_64bit = is_64bit,
+        .multiple_messages = multiple_msg_capable,
+        .enabled = enabled,
+    };
+}
+
+/// 启用MSI
+pub fn enable_msi(addr: PCIAddress, msi: *MSICapability, vector: u8) void {
+    // 设置Message Address寄存器
+    const msg_addr_offset = msi.offset + 4;
+    if (msi.is_64bit) {
+        // 64位地址: 0xFEE00000 + (APIC ID << 12)
+        const addr_low: u32 = 0xFEE00000;
+        const addr_high: u32 = 0;
+        pci_config_write_dword(addr, msg_addr_offset, addr_low);
+        pci_config_write_dword(addr, msg_addr_offset + 4, addr_high);
+        
+        // Message Data寄存器在64位BAR后面 (offset + 12)
+        const msg_data_offset = msg_addr_offset + 8;
+        pci_config_write_word(addr, msg_data_offset, @as(u16, vector));
+    } else {
+        // 32位地址
+        pci_config_write_dword(addr, msg_addr_offset, 0xFEE00000);
+        
+        // Message Data寄存器在32位BAR后面 (offset + 8)
+        const msg_data_offset = msg_addr_offset + 4;
+        pci_config_write_word(addr, msg_data_offset, @as(u16, vector));
+    }
+    
+    // 启用MSI
+    var control = msi.control;
+    control |= MSI_CONTROL_ENABLE;
+    pci_config_write_word(addr, msi.offset + 2, control);
+    msi.enabled = true;
+}
+
+// ============================================================================
+// 扫描设备的Capability列表
+// ============================================================================
 
 /// 扫描设备的Capability列表
 pub fn scan_capabilities(addr: PCIAddress) CapabilityList {
@@ -962,5 +1044,87 @@ export fn pci_get_interrupt_info(device_index: usize, out_line: *u8, out_pin: *u
     out_line.* = dev.interrupt_line;
     out_pin.* = dev.interrupt_pin;
     return true;
+}
+
+// ============================================================================
+// 设备过滤和查询API
+// ============================================================================
+
+/// 按Vendor ID查找设备
+export fn pci_find_by_vendor(vendor_id: u16, out_indices: [*]usize, max_count: usize) usize {
+    var found: usize = 0;
+    for (0..device_count) |i| {
+        if (found >= max_count) break;
+        if (device_list[i].vendor_id == vendor_id) {
+            out_indices[found] = i;
+            found += 1;
+        }
+    }
+    return found;
+}
+
+/// 按Device ID查找设备
+export fn pci_find_by_device(device_id: u16, out_indices: [*]usize, max_count: usize) usize {
+    var found: usize = 0;
+    for (0..device_count) |i| {
+        if (found >= max_count) break;
+        if (device_list[i].device_id == device_id) {
+            out_indices[found] = i;
+            found += 1;
+        }
+    }
+    return found;
+}
+
+/// 按Vendor和Device ID同时查找（精确匹配）
+export fn pci_find_by_vendor_and_device(vendor_id: u16, device_id: u16, out_indices: [*]usize, max_count: usize) usize {
+    var found: usize = 0;
+    for (0..device_count) |i| {
+        if (found >= max_count) break;
+        if (device_list[i].vendor_id == vendor_id and device_list[i].device_id == device_id) {
+            out_indices[found] = i;
+            found += 1;
+        }
+    }
+    return found;
+}
+
+/// 按Class Code查找设备
+export fn pci_find_by_class(class_code: u8, out_indices: [*]usize, max_count: usize) usize {
+    var found: usize = 0;
+    for (0..device_count) |i| {
+        if (found >= max_count) break;
+        if (device_list[i].class_code == class_code) {
+            out_indices[found] = i;
+            found += 1;
+        }
+    }
+    return found;
+}
+
+/// 按Class和SubClass查找设备
+export fn pci_find_by_class_and_subclass(class_code: u8, subclass: u8, out_indices: [*]usize, max_count: usize) usize {
+    var found: usize = 0;
+    for (0..device_count) |i| {
+        if (found >= max_count) break;
+        if (device_list[i].class_code == class_code and device_list[i].subclass == subclass) {
+            out_indices[found] = i;
+            found += 1;
+        }
+    }
+    return found;
+}
+
+/// 按Bus号查找设备
+export fn pci_find_by_bus(bus: u8, out_indices: [*]usize, max_count: usize) usize {
+    var found: usize = 0;
+    for (0..device_count) |i| {
+        if (found >= max_count) break;
+        if (device_list[i].address.bus == bus) {
+            out_indices[found] = i;
+            found += 1;
+        }
+    }
+    return found;
 }
 
