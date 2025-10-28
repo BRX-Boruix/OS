@@ -125,6 +125,13 @@ typedef struct {
 void rust_set_hhdm_offset(uint64_t offset);
 
 /**
+ * 获取HHDM偏移量
+ * 
+ * @return HHDM偏移量（物理地址到虚拟地址的映射偏移）
+ */
+uint64_t rust_get_hhdm_offset(void);
+
+/**
  * 初始化Rust内存管理器
  * 
  * @param memory_regions 内存区域数组指针

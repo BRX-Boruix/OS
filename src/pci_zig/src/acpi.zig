@@ -57,6 +57,13 @@ pub const MCFG = extern struct {
 };
 
 // ============================================================================
+// 外部函数声明
+// ============================================================================
+
+// 从Rust内存管理器获取HHDM偏移
+extern fn rust_get_hhdm_offset() u64;
+
+// ============================================================================
 // 串口调试输出
 // ============================================================================
 
@@ -116,8 +123,8 @@ fn signature_match(sig1: []const u8, sig2: []const u8) bool {
 
 /// 在EBDA区域搜索RSDP
 fn find_rsdp_in_ebda() ?*RSDP {
-    // x86_64长模式：物理地址需要加上高半核心偏移
-    const KERNEL_OFFSET: u64 = 0xFFFFFFFF80000000;
+    // x86_64长模式：物理地址需要加上HHDM偏移（由Limine提供）
+    const KERNEL_OFFSET = rust_get_hhdm_offset();
     
     // EBDA地址存储在0x40E（BDA中），需要映射到高地址
     const bda_ebda_ptr = @as(*const u16, @ptrFromInt(0x40E + KERNEL_OFFSET));
@@ -150,8 +157,8 @@ fn find_rsdp_in_ebda() ?*RSDP {
 fn find_rsdp_in_bios() ?*RSDP {
     serial_print("[ACPI] Searching RSDP in BIOS area\n");
     
-    // x86_64长模式：物理地址需要加上高半核心偏移
-    const KERNEL_OFFSET: u64 = 0xFFFFFFFF80000000;
+    // x86_64长模式：物理地址需要加上HHDM偏移（由Limine提供）
+    const KERNEL_OFFSET = rust_get_hhdm_offset();
     
     // BIOS E0000-FFFFF区域
     var addr: usize = 0xE0000;
@@ -172,6 +179,17 @@ fn find_rsdp_in_bios() ?*RSDP {
 pub fn find_rsdp() ?*RSDP {
     serial_print("[ACPI] Starting RSDP search...\n");
     
+    // 检查HHDM偏移是否已初始化
+    const hhdm_offset = rust_get_hhdm_offset();
+    serial_print("[ACPI] HHDM offset: ");
+    serial_print_hex(hhdm_offset);
+    serial_print("\n");
+    
+    if (hhdm_offset == 0) {
+        serial_print("[ACPI] ERROR: HHDM offset is 0! Cannot access physical memory.\n");
+        return null;
+    }
+    
     // 先在EBDA搜索
     if (find_rsdp_in_ebda()) |rsdp| {
         return rsdp;
@@ -188,7 +206,7 @@ pub fn find_rsdp() ?*RSDP {
 
 /// 在RSDT中查找表
 fn find_table_in_rsdt(rsdt: *RSDT, signature: []const u8) ?*ACPISDTHeader {
-    const KERNEL_OFFSET: u64 = 0xFFFFFFFF80000000;
+    const KERNEL_OFFSET = rust_get_hhdm_offset();
     
     const entry_count = (rsdt.header.length - @sizeOf(ACPISDTHeader)) / 4;
     const entries = @as([*]u32, @ptrFromInt(@intFromPtr(rsdt) + @sizeOf(ACPISDTHeader)));
@@ -215,7 +233,7 @@ fn find_table_in_rsdt(rsdt: *RSDT, signature: []const u8) ?*ACPISDTHeader {
 
 /// 在XSDT中查找表
 fn find_table_in_xsdt(xsdt: *XSDT, signature: []const u8) ?*ACPISDTHeader {
-    const KERNEL_OFFSET: u64 = 0xFFFFFFFF80000000;
+    const KERNEL_OFFSET = rust_get_hhdm_offset();
     
     const entry_count = (xsdt.header.length - @sizeOf(ACPISDTHeader)) / 8;
     const entries = @as([*]u64, @ptrFromInt(@intFromPtr(xsdt) + @sizeOf(ACPISDTHeader)));
@@ -248,7 +266,7 @@ pub fn find_table(signature: []const u8) ?*ACPISDTHeader {
     serial_print_hex(rsdp.revision);
     serial_print("\n");
     
-    const KERNEL_OFFSET: u64 = 0xFFFFFFFF80000000;
+    const KERNEL_OFFSET = rust_get_hhdm_offset();
     
     // 优先使用XSDT（ACPI 2.0+）
     if (rsdp.revision >= 2 and rsdp.xsdt_address != 0) {

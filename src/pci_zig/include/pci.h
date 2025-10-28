@@ -13,6 +13,9 @@
 extern "C" {
 #endif
 
+// 外部函数声明：获取HHDM偏移量（由Rust内存管理器提供）
+extern uint64_t rust_get_hhdm_offset(void);
+
 // PCI设备信息结构（与Zig中的PCIDeviceC对应）
 typedef struct {
     uint8_t  bus;          // 总线号

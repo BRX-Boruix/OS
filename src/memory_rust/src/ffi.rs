@@ -53,6 +53,12 @@ pub extern "C" fn rust_set_hhdm_offset(offset: u64) {
     hhdm::set_offset(offset);
 }
 
+/// 获取HHDM偏移量（C FFI）
+#[no_mangle]
+pub extern "C" fn rust_get_hhdm_offset() -> u64 {
+    hhdm::get_offset()
+}
+
 /// 初始化Rust内存管理器
 /// 阶段2: 真实初始化物理分配器
 #[no_mangle]

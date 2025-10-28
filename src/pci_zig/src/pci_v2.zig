@@ -182,12 +182,18 @@ fn pci_legacy_read_byte(addr: PCIAddress, offset: u8) u8 {
 // PCI配置空间访问 - MCFG ECAM模式
 // ============================================================================
 
+// 外部函数：获取HHDM偏移
+extern fn rust_get_hhdm_offset() u64;
+
 fn pci_ecam_address(base: u64, addr: PCIAddress, offset: u8) u64 {
-    return base +
+    // ECAM基地址是物理地址，需要加上HHDM偏移才能访问
+    const hhdm_offset = rust_get_hhdm_offset();
+    const phys_addr = base +
         (@as(u64, addr.bus) << 20) |
         (@as(u64, addr.device) << 15) |
         (@as(u64, addr.function) << 12) |
         @as(u64, offset);
+    return phys_addr + hhdm_offset;
 }
 
 fn pci_ecam_read_dword(base: u64, addr: PCIAddress, offset: u8) u32 {
@@ -539,7 +545,7 @@ export fn pci_init() void {
     serial_print("\n[PCI] ========== PCI Driver V2 ==========\n");
     device_count = 0;
     
-    // 尝试启用MCFG
+    // 尝试启用MCFG（如果HHDM不可用会自动回退到Legacy）
     serial_print("[PCI] Checking for MCFG support...\n");
     if (acpi.find_mcfg()) |mcfg| {
         mcfg_table = mcfg;
