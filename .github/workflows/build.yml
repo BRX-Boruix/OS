@@ -30,7 +30,18 @@ jobs:
           xorriso \
           mtools \
           git \
-          curl
+          curl \
+          wget
+    
+    # 安装Zig工具链
+    - name: Install Zig toolchain
+      run: |
+        echo "Installing Zig toolchain..."
+        chmod +x ./zig.sh
+        sudo ./zig.sh
+        echo "Verifying Zig installation..."
+        zig version
+        echo "Zig toolchain installed successfully"
     
     # 安装Rust工具链
     - name: Install Rust toolchain
