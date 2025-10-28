@@ -7,6 +7,7 @@
 #include "../builtin/lspci/lspci.h"
 #include "../builtin/test_pci/test_pci.h"
 #include "../builtin/pci_info/pci_info.h"
+#include "../builtin/shutdown/shutdown.h"
 #include "kernel/shell.h"
 #include "drivers/display.h"
 
@@ -33,6 +34,7 @@ static shell_command_t commands[] = {
     {"irqinfo", "Show IRQ configuration", cmd_irqinfo},
     {"irqprio", "Manage IRQ priorities", cmd_irqprio},
     {"reboot", "Reboot system", cmd_reboot},
+    {"shutdown", "Shutdown system", cmd_shutdown},
     {"great", "Let the great Yang Borui give you the answer.", cmd_great},
     {"license", "Show license information for projects", cmd_license},
     {"lspci", "List all PCI devices", cmd_lspci},
