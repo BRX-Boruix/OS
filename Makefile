@@ -15,6 +15,7 @@ AS = nasm
 CC = gcc
 LD = ld
 CARGO = cargo
+ZIG = zig
 
 # 架构相关设置 (仅x86_64)
 ASFLAGS = -f elf64
@@ -80,11 +81,15 @@ RUST_PROJECTS := $(shell find $(SRC_DIR) -name "Cargo.toml" -exec dirname {} \; 
 # 生成Rust库文件列表（明确指定已知的库文件）
 RUST_LIBS := $(SRC_DIR)/memory_rust/librust_memory.a
 
+# Zig项目
+ZIG_PROJECTS := $(SRC_DIR)/pci_zig
+ZIG_LIBS := $(SRC_DIR)/pci_zig/zig-out/libpci.a
+
 # 生成对象文件列表（加上语言后缀避免C和ASM重名）
 # 格式：父文件夹-文件名-语言.o
 KERNEL_C_OBJS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_ARCH_DIR)/%-c.o,$(KERNEL_SRCS))
 KERNEL_ASM_OBJS = $(patsubst $(SRC_DIR)/%.asm,$(BUILD_ARCH_DIR)/%-asm.o,$(KERNEL_ASM_SRCS))
-KERNEL_OBJS = $(KERNEL_C_OBJS) $(KERNEL_ASM_OBJS) $(RUST_LIBS)
+KERNEL_OBJS = $(KERNEL_C_OBJS) $(KERNEL_ASM_OBJS) $(RUST_LIBS) $(ZIG_LIBS)
 
 LINKER_SCRIPT = $(SRC_DIR)/kernel/arch/$(ARCH_DIR)/boot/linker.ld
 
@@ -134,7 +139,7 @@ $(BUILD_ARCH_DIR)/linker.ld: $(LINKER_SCRIPT) | $(BUILD_ARCH_DIR)
 # C源文件编译规则（新命名方式：文件名-c.o）
 $(BUILD_ARCH_DIR)/%-c.o: $(SRC_DIR)/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -I$(SRC_DIR)/kernel/include -c $< -o $@
+	$(CC) $(CFLAGS) -I$(SRC_DIR)/kernel/include -I$(SRC_DIR)/pci_zig/include -c $< -o $@
 
 # 汇编文件编译规则（新命名方式：文件名-asm.o）
 $(BUILD_ARCH_DIR)/%-asm.o: $(SRC_DIR)/%.asm
@@ -170,6 +175,11 @@ $(SRC_DIR)/memory_rust/librust_memory.a: $(SRC_DIR)/memory_rust/Cargo.toml $(wil
 	@echo "构建Rust内存管理器..."
 	@cd $(SRC_DIR)/memory_rust && RUSTFLAGS="$(RUSTFLAGS)" $(CARGO) build --release --target $(RUST_TARGET)
 	@cd $(SRC_DIR)/memory_rust && cp target/$(RUST_TARGET)/release/libboruix_memory.a librust_memory.a
+
+# Zig库编译规则
+$(SRC_DIR)/pci_zig/zig-out/libpci.a: $(wildcard $(SRC_DIR)/pci_zig/src/*.zig)
+	@echo "构建PCI驱动（Zig）..."
+	@cd $(SRC_DIR)/pci_zig && make
 
 # 链接内核
 $(KERNEL): $(KERNEL_OBJS) $(BUILD_ARCH_DIR)/linker.ld
@@ -212,6 +222,13 @@ clean:
 			rm -f "$$project"/lib*.a; \
 		fi; \
 	done
+	@# 清理Zig构建产物
+	@for project in $(ZIG_PROJECTS); do \
+		if [ -d "$$project" ]; then \
+			echo "清理Zig项目: $$project"; \
+			cd "$$project" && rm -rf zig-out zig-cache .zig-cache; \
+		fi; \
+	done
 
 # 清理所有架构
 clean-all:
@@ -222,7 +239,21 @@ distclean: clean-all
 
 # 运行虚拟机
 run: $(ISO)
-	$(QEMU) -cdrom $(ISO) -boot d -serial stdio -no-reboot -d cpu_reset
+	$(QEMU) \
+		-machine q35 \
+		-cpu Haswell,+x2apic \
+		-m 512M \
+		-smp 2 \
+		-serial stdio \
+		-no-reboot \
+		-d cpu_reset \
+		-device e1000,netdev=net0 \
+		-netdev user,id=net0 \
+		-device VGA \
+		-device ich9-ahci,id=ahci \
+		-device usb-ehci,id=ehci \
+		-cdrom $(ISO) \
+		-boot d
 
 # 安装Limine（如果需要）
 install-limine:
@@ -278,6 +309,26 @@ clippy-rust:
 		fi; \
 	done
 
+# 仅构建Zig项目
+build-zig:
+	@echo "构建所有Zig项目..."
+	@for project in $(ZIG_PROJECTS); do \
+		if [ -d "$$project" ]; then \
+			echo "构建Zig项目: $$project"; \
+			cd "$$project" && make; \
+		fi; \
+	done
+
+# 格式化Zig代码
+fmt-zig:
+	@echo "格式化所有Zig项目..."
+	@for project in $(ZIG_PROJECTS); do \
+		if [ -d "$$project" ]; then \
+			echo "格式化Zig项目: $$project"; \
+			cd "$$project" && $(ZIG) fmt src/; \
+		fi; \
+	done
+
 # 显示当前架构信息
 info:
 	@echo "Current architecture: $(ARCH)"
@@ -296,14 +347,14 @@ info:
 
 # 显示帮助
 help:
-	@echo "Boruix OS (x86_64 only) - Limine Bootloader + Rust支持"
+	@echo "Boruix OS (x86_64 only)"
 	@echo ""
 	@echo "主要目标:"
-	@echo "  all           - 构建完整的ISO镜像（包含C和Rust代码）"
+	@echo "  all           - 构建完整的ISO镜像（包含C、Rust和Zig代码）"
 	@echo "  make all TEST=1    - 构建包含测试命令的ISO镜像"
 	@echo "  rebuild       - 强制重新构建"
 	@echo "  make rebuild TEST=1 - 强制重新构建（包含测试命令）"
-	@echo "  clean         - 清理构建文件（包含Rust构建产物）"
+	@echo "  clean         - 清理构建文件（包含Rust和Zig构建产物）"
 	@echo "  clean-all     - 清理所有构建文件"
 	@echo "  distclean     - 深度清理"
 	@echo "  run           - 在QEMU中运行ISO"
@@ -315,13 +366,17 @@ help:
 	@echo "  fmt-rust      - 格式化所有Rust代码"
 	@echo "  clippy-rust   - 运行Clippy静态分析"
 	@echo ""
+	@echo "Zig相关目标:"
+	@echo "  build-zig     - 仅构建所有Zig项目"
+	@echo "  fmt-zig       - 格式化所有Zig代码"
+	@echo ""
 	@echo "其他目标:"
 	@echo "  install-limine - 安装Limine引导加载程序"
-	@echo "  info          - 显示架构和Rust信息"
+	@echo "  info          - 显示架构和Rust/Zig信息"
 	@echo "  help          - 显示此帮助"
 	@echo ""
 	@echo "选项:"
 	@echo "  TEST=1        - 启用测试命令（可与 all、rebuild、run 配合使用）"
 	@echo "                  示例: make all TEST=1"
 
-.PHONY: all rebuild clean clean-all distclean run install-limine build-all build-rust check-rust fmt-rust clippy-rust info help
+.PHONY: all rebuild clean clean-all distclean run install-limine build-all build-rust check-rust fmt-rust clippy-rust build-zig fmt-zig info help
