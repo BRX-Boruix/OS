@@ -29,6 +29,7 @@ $(TARGET_LIB): $(TARGET_OBJ)
 clean:
 	@echo "Cleaning PCI driver build..."
 	@rm -rf zig-out zig-cache .zig-cache
+	@rm -f *.o *.a *.ll
 	@echo "Clean complete"
 
 install: $(TARGET_LIB)
