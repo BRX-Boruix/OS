@@ -109,7 +109,7 @@ static inline uint64_t get_physical_addr_x86_64(uint64_t virtual_addr) {
 #define unmap_page(vaddr) unmap_page_x86_64(vaddr)
 #define get_physical_addr(vaddr) get_physical_addr_x86_64(vaddr)
 
-// 通用函数（这些保持C实现，因为它们是基础函数）
+// 通用函数（编译器内置实现）
 void* memset(void* dest, int value, size_t count);
 void* memcpy(void* dest, const void* src, size_t count);
 int memcmp(const void* ptr1, const void* ptr2, size_t count);
