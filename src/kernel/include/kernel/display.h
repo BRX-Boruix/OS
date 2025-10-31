@@ -1,14 +1,13 @@
 // Boruix OS 显示模块头文件
-// 处理VGA文本模式显示
+// 统一显示驱动接口 - 基于Flanterm库的现代终端仿真
+// 简化包装层，指向实际的显示驱动
 
 #ifndef BORUIX_DISPLAY_H
 #define BORUIX_DISPLAY_H
 
-// 显示函数声明
-void clear_screen(void);
-void set_cursor(int x, int y);
-void print_char(char c);
-void print_string(const char* str);
-void delay(int count);
+#include "drivers/display.h"
+
+// 向后兼容: 这个头文件主要用于简化包含路径
+// 所有实际的函数声明都在 drivers/display.h 中
 
 #endif // BORUIX_DISPLAY_H
