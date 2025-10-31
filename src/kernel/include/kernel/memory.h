@@ -51,10 +51,6 @@ typedef rust_memory_region_t memory_region_t;
 #define KERNEL_HEAP_START     0xFFFFFFFF90000000ULL
 #define KERNEL_HEAP_END       0xFFFFFFFFA0000000ULL
 
-// 简单分配器函数（备用）
-extern void* simple_malloc(size_t size);
-extern void simple_free(void* ptr);
-
 // 内存管理函数（使用Rust内存管理器）
 static inline int memory_init_x86_64(uint64_t multiboot_info) {
     (void)multiboot_info;
@@ -67,11 +63,11 @@ static inline int memory_init_x86_64(uint64_t multiboot_info) {
 }
 
 static inline void* kmalloc_x86_64(size_t size) {
-    return simple_malloc(size);
+    return rust_kmalloc(size);
 }
 
 static inline void kfree_x86_64(void* ptr) {
-    simple_free(ptr);
+    rust_kfree(ptr);
 }
 
 static inline void* map_page_x86_64(uint64_t virtual_addr, uint64_t physical_addr, uint64_t flags) {
@@ -105,10 +101,10 @@ static inline uint64_t get_physical_addr_x86_64(uint64_t virtual_addr) {
 
 #endif
 
-// 通用内存管理接口（映射到简单分配器）
+// 通用内存管理接口（映射到Rust内存管理器）
 #define memory_init(info) memory_init_x86_64(info)
-#define kmalloc(size) simple_malloc(size)
-#define kfree(ptr) simple_free(ptr)
+#define kmalloc(size) rust_kmalloc(size)
+#define kfree(ptr) rust_kfree(ptr)
 #define map_page(vaddr, paddr, flags) map_page_x86_64(vaddr, paddr, flags)
 #define unmap_page(vaddr) unmap_page_x86_64(vaddr)
 #define get_physical_addr(vaddr) get_physical_addr_x86_64(vaddr)
@@ -127,7 +123,5 @@ static inline void free_page(uint64_t page_addr) {
     rust_free_page(page_addr);
 }
 
-// 内存统计函数（简单实现）
-extern void simple_memory_stats(size_t *total, size_t *used, size_t *free, size_t *peak);
 
 #endif // BORUIX_MEMORY_H

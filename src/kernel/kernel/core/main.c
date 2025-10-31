@@ -205,15 +205,17 @@ void kmain(void) {
         print_string("Memory deallocation: SUCCESS\n");
         
         // 获取内存统计
-        size_t total, used, free, peak;
-        simple_memory_stats(&total, &used, &free, &peak);
-        print_string("Memory stats - Total: ");
-        print_dec((uint32_t)(total / 1024));
-        print_string(" KB, Used: ");
-        print_dec((uint32_t)(used / 1024));
-        print_string(" KB, Free: ");
-        print_dec((uint32_t)(free / 1024));
-        print_string(" KB\n");
+        rust_memory_stats_t stats = {0};
+        int ret = rust_memory_stats(&stats);
+        if (ret == 0) {
+            print_string("Memory stats - Allocated: ");
+            print_dec((uint32_t)(stats.heap.allocated / 1024));
+            print_string(" KB, Free: ");
+            print_dec((uint32_t)(stats.heap.free / 1024));
+            print_string(" KB, Peak: ");
+            print_dec((uint32_t)(stats.heap.peak_usage / 1024));
+            print_string(" KB\n");
+        }
         
         // 释放剩余内存
         kfree(ptr1);
